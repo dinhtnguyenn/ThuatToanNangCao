@@ -248,16 +248,19 @@ class SortingAlgorithms {
     let swaps = 0; // In merge sort, we count "moves" as swaps
     const t0 = performance.now();
 
-    function merge(a, left, mid, right) {
+    function merge(a, left, mid, right, depth) {
       const leftArr = a.slice(left, mid + 1);
       const rightArr = a.slice(mid + 1, right + 1);
       let i = 0, j = 0, k = left;
 
       steps.push({
-        type: 'info',
+        type: 'merge-start',
         indices: Array.from({ length: right - left + 1 }, (_, idx) => left + idx),
-        description: `Trộn hai nửa [${left}..${mid}] và [${mid + 1}..${right}]`,
-        line: 3
+        range: [left, right],
+        midPoint: mid,
+        depth,
+        description: `⤵ CONQUER (depth=${depth}): Trộn nửa trái [${left}..${mid}] với nửa phải [${mid + 1}..${right}]`,
+        line: 5
       });
 
       while (i < leftArr.length && j < rightArr.length) {
@@ -265,8 +268,10 @@ class SortingAlgorithms {
         steps.push({
           type: 'compare',
           indices: [left + i, mid + 1 + j],
-          description: `So sánh ${leftArr[i]} với ${rightArr[j]}`,
-          line: 4
+          range: [left, right],
+          depth,
+          description: `So sánh nửa trái[${i}]=${leftArr[i]} với nửa phải[${j}]=${rightArr[j]}`,
+          line: 6
         });
 
         const cond = order === 'asc' ? leftArr[i] <= rightArr[j] : leftArr[i] >= rightArr[j];
@@ -276,8 +281,10 @@ class SortingAlgorithms {
             type: 'merge',
             indices: [k],
             values: [...a],
-            description: `Đặt ${leftArr[i]} vào vị trí ${k}`,
-            line: 5
+            range: [left, right],
+            depth,
+            description: `Đặt ${leftArr[i]} (từ nửa trái) vào vị trí ${k}`,
+            line: 7
           });
           i++;
         } else {
@@ -286,8 +293,10 @@ class SortingAlgorithms {
             type: 'merge',
             indices: [k],
             values: [...a],
-            description: `Đặt ${rightArr[j]} vào vị trí ${k}`,
-            line: 6
+            range: [left, right],
+            depth,
+            description: `Đặt ${rightArr[j]} (từ nửa phải) vào vị trí ${k}`,
+            line: 7
           });
           j++;
         }
@@ -301,7 +310,9 @@ class SortingAlgorithms {
           type: 'merge',
           indices: [k],
           values: [...a],
-          description: `Đặt phần tử còn lại ${leftArr[i]} vào vị trí ${k}`,
+          range: [left, right],
+          depth,
+          description: `Đặt phần tử còn lại ${leftArr[i]} (nửa trái) vào vị trí ${k}`,
           line: 7
         });
         swaps++;
@@ -315,43 +326,90 @@ class SortingAlgorithms {
           type: 'merge',
           indices: [k],
           values: [...a],
-          description: `Đặt phần tử còn lại ${rightArr[j]} vào vị trí ${k}`,
+          range: [left, right],
+          depth,
+          description: `Đặt phần tử còn lại ${rightArr[j]} (nửa phải) vào vị trí ${k}`,
           line: 7
         });
         swaps++;
         j++;
         k++;
       }
+
+      steps.push({
+        type: 'merge-done',
+        indices: Array.from({ length: right - left + 1 }, (_, idx) => left + idx),
+        range: [left, right],
+        depth,
+        description: `✓ Đã trộn xong [${left}..${right}] → [${a.slice(left, right + 1).join(', ')}]`,
+        line: 8
+      });
     }
 
-    function mergeSortRec(a, left, right) {
-      if (left >= right) return;
+    function mergeSortRec(a, left, right, depth) {
+      if (left >= right) {
+        if (left === right) {
+          steps.push({
+            type: 'base-case',
+            indices: [left],
+            range: [left, right],
+            depth,
+            description: `■ BASE CASE (depth=${depth}): Phần tử đơn a[${left}]=${a[left]}, không cần chia thêm`,
+            line: 1
+          });
+        }
+        return;
+      }
 
       const mid = Math.floor((left + right) / 2);
 
       steps.push({
-        type: 'info',
+        type: 'divide',
         indices: Array.from({ length: right - left + 1 }, (_, idx) => left + idx),
-        description: `Chia mảng [${left}..${right}] tại mid=${mid}`,
-        line: 0
+        range: [left, right],
+        midPoint: mid,
+        depth,
+        description: `✂ DIVIDE (depth=${depth}): Chia [${left}..${right}] thành [${left}..${mid}] và [${mid + 1}..${right}]`,
+        line: 2
       });
 
-      mergeSortRec(a, left, mid);
-      mergeSortRec(a, mid + 1, right);
-      merge(a, left, mid, right);
+      steps.push({
+        type: 'recurse-left',
+        indices: Array.from({ length: mid - left + 1 }, (_, idx) => left + idx),
+        range: [left, mid],
+        depth: depth + 1,
+        description: `↙ Đệ quy nửa TRÁI [${left}..${mid}] (${mid - left + 1} phần tử)`,
+        line: 3
+      });
+
+      mergeSortRec(a, left, mid, depth + 1);
+
+      steps.push({
+        type: 'recurse-right',
+        indices: Array.from({ length: right - mid }, (_, idx) => mid + 1 + idx),
+        range: [mid + 1, right],
+        depth: depth + 1,
+        description: `↘ Đệ quy nửa PHẢI [${mid + 1}..${right}] (${right - mid} phần tử)`,
+        line: 4
+      });
+
+      mergeSortRec(a, mid + 1, right, depth + 1);
+      merge(a, left, mid, right, depth);
 
       // Mark as sorted if full range
       if (left === 0 && right === n - 1) {
         steps.push({
           type: 'sorted',
           indices: Array.from({ length: n }, (_, i) => i),
+          range: [0, n - 1],
+          depth: 0,
           description: 'Toàn bộ mảng đã được sắp xếp!',
           line: 8
         });
       }
     }
 
-    mergeSortRec(a, 0, n - 1);
+    mergeSortRec(a, 0, n - 1, 0);
     steps.push({ type: 'done', indices: [], description: 'Hoàn thành Merge Sort!' });
 
     return {
@@ -372,12 +430,14 @@ class SortingAlgorithms {
     let swaps = 0;
     const t0 = performance.now();
 
-    function partition(a, low, high) {
+    function partition(a, low, high, depth) {
       const pivot = a[high];
       steps.push({
         type: 'pivot',
         indices: [high],
-        description: `Chọn pivot = a[${high}] = ${pivot}`,
+        range: [low, high],
+        depth,
+        description: `🎯 PIVOT (depth=${depth}): Chọn pivot = a[${high}] = ${pivot} trong [${low}..${high}]`,
         line: 1
       });
 
@@ -388,6 +448,8 @@ class SortingAlgorithms {
         steps.push({
           type: 'compare',
           indices: [j, high],
+          range: [low, high],
+          depth,
           description: `So sánh a[${j}]=${a[j]} với pivot=${pivot}`,
           line: 3
         });
@@ -399,7 +461,9 @@ class SortingAlgorithms {
             steps.push({
               type: 'swap',
               indices: [i, j],
-              description: `Hoán đổi a[${i}]=${a[i]} ↔ a[${j}]=${a[j]}`,
+              range: [low, high],
+              depth,
+              description: `Hoán đổi a[${i}]=${a[i]} ↔ a[${j}]=${a[j]} (đưa về bên ${order === 'asc' ? 'trái' : 'phải'} pivot)`,
               line: 4
             });
             [a[i], a[j]] = [a[j], a[i]];
@@ -412,46 +476,91 @@ class SortingAlgorithms {
         steps.push({
           type: 'swap',
           indices: [i + 1, high],
+          range: [low, high],
+          depth,
           description: `Đặt pivot vào đúng vị trí: hoán đổi a[${i + 1}]=${a[i + 1]} ↔ pivot=${a[high]}`,
-          line: 6
+          line: 5
         });
         [a[i + 1], a[high]] = [a[high], a[i + 1]];
         swaps++;
       }
 
       steps.push({
-        type: 'sorted',
+        type: 'partition-done',
         indices: [i + 1],
-        description: `Pivot ${a[i + 1]} đã ở đúng vị trí ${i + 1}`,
-        line: 7
+        range: [low, high],
+        pivotIndex: i + 1,
+        depth,
+        leftPart: i + 1 > low ? `[${low}..${i}]` : '(rỗng)',
+        rightPart: i + 1 < high ? `[${i + 2}..${high}]` : '(rỗng)',
+        description: `✓ PARTITION DONE: pivot=${a[i + 1]} ở vị trí ${i + 1} | Trái: ${i + 1 > low ? `[${low}..${i}]` : '∅'} | Phải: ${i + 1 < high ? `[${i + 2}..${high}]` : '∅'}`,
+        line: 6
       });
 
       return i + 1;
     }
 
-    function quickSortRec(a, low, high) {
+    function quickSortRec(a, low, high, depth) {
       if (low < high) {
         steps.push({
-          type: 'info',
+          type: 'divide',
           indices: Array.from({ length: high - low + 1 }, (_, idx) => low + idx),
-          description: `Phân hoạch mảng con [${low}..${high}]`,
+          range: [low, high],
+          depth,
+          description: `✂ DIVIDE (depth=${depth}): Phân hoạch mảng con [${low}..${high}] (${high - low + 1} phần tử)`,
           line: 0
         });
 
-        const pi = partition(a, low, high);
-        quickSortRec(a, low, pi - 1);
-        quickSortRec(a, pi + 1, high);
-      } else if (low === high) {
+        const pi = partition(a, low, high, depth);
+
+        // Mark pivot as sorted
         steps.push({
           type: 'sorted',
+          indices: [pi],
+          range: [low, high],
+          depth,
+          description: `✓ Pivot ${a[pi]} cố định tại vị trí ${pi}`,
+          line: 7
+        });
+
+        if (pi - 1 > low) {
+          steps.push({
+            type: 'recurse-left',
+            indices: Array.from({ length: pi - low }, (_, idx) => low + idx),
+            range: [low, pi - 1],
+            depth: depth + 1,
+            description: `↙ Đệ quy nửa TRÁI [${low}..${pi - 1}] (${pi - low} phần tử, depth=${depth + 1})`,
+            line: 8
+          });
+        }
+
+        quickSortRec(a, low, pi - 1, depth + 1);
+
+        if (pi + 1 < high) {
+          steps.push({
+            type: 'recurse-right',
+            indices: Array.from({ length: high - pi }, (_, idx) => pi + 1 + idx),
+            range: [pi + 1, high],
+            depth: depth + 1,
+            description: `↘ Đệ quy nửa PHẢI [${pi + 1}..${high}] (${high - pi} phần tử, depth=${depth + 1})`,
+            line: 8
+          });
+        }
+
+        quickSortRec(a, pi + 1, high, depth + 1);
+      } else if (low === high) {
+        steps.push({
+          type: 'base-case',
           indices: [low],
-          description: `Phần tử đơn a[${low}]=${a[low]} đã sắp xếp`,
+          range: [low, high],
+          depth,
+          description: `■ BASE CASE (depth=${depth}): Phần tử đơn a[${low}]=${a[low]}, đã đúng vị trí`,
           line: 7
         });
       }
     }
 
-    quickSortRec(a, 0, n - 1);
+    quickSortRec(a, 0, n - 1, 0);
     steps.push({ type: 'done', indices: [], description: 'Hoàn thành Quick Sort!' });
 
     return {
@@ -661,17 +770,17 @@ class SortingAlgorithms {
         worst: 'O(n log n)',
         space: 'O(n)',
         stable: true,
-        description: 'Chia đôi mảng, sắp xếp từng nửa, rồi trộn lại.',
+        description: 'Chia đôi mảng, sắp xếp từng nửa, rồi trộn lại (Divide & Conquer).',
         pseudocode: [
           'mergeSort(a, left, right):',
-          '  if left >= right: return',
-          '  mid = (left+right) / 2',
-          '  mergeSort(a, left, mid)',
-          '  mergeSort(a, mid+1, right)',
-          '  merge(a, left, mid, right)',
-          '  // Trộn hai nửa đã sắp xếp',
+          '  if left >= right: return  // base case',
+          '  mid = (left+right) / 2   // ✂ DIVIDE',
+          '  mergeSort(a, left, mid)   // ↙ nửa trái',
+          '  mergeSort(a, mid+1, right)// ↘ nửa phải',
+          '  merge(a, left, mid, right)// ⤵ CONQUER',
+          '  // So sánh từng cặp phần tử',
           '  // Đặt phần tử nhỏ hơn trước',
-          '  // Hoàn thành trộn'
+          '  // ✓ Đã trộn xong'
         ]
       },
       quick: {
@@ -681,17 +790,17 @@ class SortingAlgorithms {
         worst: 'O(n²)',
         space: 'O(log n)',
         stable: false,
-        description: 'Chọn pivot, phân hoạch xung quanh pivot, đệ quy hai bên.',
+        description: 'Chọn pivot, phân hoạch xung quanh pivot, đệ quy hai bên (Divide & Conquer).',
         pseudocode: [
-          'quickSort(a, low, high):',
-          '  pivot = a[high]',
+          'quickSort(a, low, high): // ✂ DIVIDE',
+          '  pivot = a[high]         // 🎯 chọn pivot',
           '  i = low - 1',
-          '  for j = low to high-1:',
+          '  for j = low to high-1:  // quét & so sánh',
           '    if a[j] < pivot:',
-          '      i++; swap(a[i], a[j])',
-          '  swap(a[i+1], a[high])',
+          '      i++; swap(a[i],a[j])// đưa về trái',
+          '  swap(a[i+1], a[high])  // ✓ partition done',
           '  // pivot ở đúng vị trí',
-          '  // Đệ quy hai phân hoạch'
+          '  // ↙↘ Đệ quy trái + phải'
         ]
       }
     };

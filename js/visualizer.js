@@ -21,6 +21,11 @@ class Visualizer {
     this.comparisons = 0;
     this.swapsCount = 0;
     this.result = null;
+
+    // Divide & Conquer tracking
+    this.activeRange = null;   // [left, right]
+    this.activeDepth = 0;
+    this.activeMidPoint = null;
   }
 
   init(allData) {
@@ -95,14 +100,36 @@ class Visualizer {
                 <div class="legend-item"><div class="legend-color swapping"></div> Hoán đổi</div>
                 <div class="legend-item"><div class="legend-color pivot"></div> Pivot</div>
                 <div class="legend-item"><div class="legend-color sorted"></div> Đã sắp xếp</div>
+                <div class="legend-item"><div class="legend-color range-active"></div> Vùng xử lý</div>
               </div>
             </div>
+            
+            <!-- Range indicator labels above chart -->
+            <div class="range-labels" id="range-labels"></div>
             <div class="bar-chart show-values" id="bar-chart"></div>
+            <!-- Range bracket below chart -->
+            <div class="range-bracket-row" id="range-bracket-row"></div>
 
             <!-- Step Info -->
             <div class="step-info">
               <div>Bước: <span class="step-counter" id="step-counter">0 / 0</span></div>
               <div class="step-description" id="step-description">Nhấn Play để bắt đầu mô phỏng</div>
+            </div>
+
+            <!-- Depth + Range Context -->
+            <div class="dc-context" id="dc-context" style="display: none;">
+              <div class="dc-item">
+                <span class="dc-label">Depth:</span>
+                <span class="dc-value" id="dc-depth">0</span>
+              </div>
+              <div class="dc-item">
+                <span class="dc-label">Range:</span>
+                <span class="dc-value" id="dc-range">-</span>
+              </div>
+              <div class="dc-item">
+                <span class="dc-label">Phase:</span>
+                <span class="dc-value" id="dc-phase">-</span>
+              </div>
             </div>
 
             <!-- Controls -->
@@ -165,6 +192,14 @@ class Visualizer {
             </div>
             <div class="pseudocode" id="vis-pseudocode"></div>
           </div>
+
+          <!-- Recursion Tree (only for merge/quick) -->
+          <div class="card" id="recursion-tree-card" style="display: none;">
+            <div class="card-header">
+              <div class="card-title">🌳 Đệ quy hiện tại</div>
+            </div>
+            <div id="recursion-tree" style="font-size: 0.82rem; font-family: var(--font-mono); color: var(--text-secondary); line-height: 1.7;"></div>
+          </div>
         </div>
       </div>
     `;
@@ -222,12 +257,19 @@ class Visualizer {
     });
   }
 
+  get isDivideConquer() {
+    return this.algorithm === 'merge' || this.algorithm === 'quick';
+  }
+
   generateSample() {
     this.stop();
     this.currentStep = -1;
     this.sortedIndices = new Set();
     this.comparisons = 0;
     this.swapsCount = 0;
+    this.activeRange = null;
+    this.activeDepth = 0;
+    this.activeMidPoint = null;
 
     // Random sample from allData
     const shuffled = [...this.allData].sort(() => Math.random() - 0.5);
@@ -248,6 +290,12 @@ class Visualizer {
     this.updateAlgoInfo();
     this.updateStats();
     this.updatePseudocode(-1);
+    this.updateDCContext(null);
+    this.renderRangeBrackets();
+
+    // Show/hide recursion tree card
+    const treeCard = document.getElementById('recursion-tree-card');
+    if (treeCard) treeCard.style.display = this.isDivideConquer ? 'block' : 'none';
   }
 
   renderBars(highlightIndices = {}) {
@@ -255,21 +303,94 @@ class Visualizer {
     if (!chart) return;
 
     const maxVal = Math.max(...this.currentValues, 1);
+    const n = this.currentValues.length;
 
     chart.innerHTML = this.currentValues.map((val, i) => {
       const height = (val / maxVal) * 100;
       let cls = 'bar';
 
+      // Determine if this bar is in the active range
+      const inRange = this.activeRange
+        ? (i >= this.activeRange[0] && i <= this.activeRange[1])
+        : true;
+
       if (this.sortedIndices.has(i)) cls += ' sorted';
       if (highlightIndices.comparing?.includes(i)) cls += ' comparing';
       if (highlightIndices.swapping?.includes(i)) cls += ' swapping';
       if (highlightIndices.pivot?.includes(i)) cls += ' pivot';
-      if (highlightIndices.merge?.includes(i)) cls += ' comparing';
+      if (highlightIndices.merge?.includes(i)) cls += ' merge-highlight';
+      if (highlightIndices.baseCase?.includes(i)) cls += ' base-case';
+      if (highlightIndices.divideLeft?.includes(i)) cls += ' divide-left';
+      if (highlightIndices.divideRight?.includes(i)) cls += ' divide-right';
 
-      return `<div class="${cls}" style="height: ${Math.max(height, 2)}%">
+      // Dim bars outside active range for D&C algorithms
+      if (this.isDivideConquer && this.activeRange && !inRange && !this.sortedIndices.has(i)) {
+        cls += ' dimmed';
+      }
+
+      // If bar is at the midpoint, add midpoint class
+      if (this.activeMidPoint !== null && i === this.activeMidPoint && this.activeRange) {
+        cls += ' midpoint';
+      }
+
+      return `<div class="${cls}" style="height: ${Math.max(height, 2)}%" data-index="${i}">
         <span class="bar-value">${typeof val === 'number' ? (val % 1 === 0 ? val : val.toFixed(1)) : val}</span>
       </div>`;
     }).join('');
+  }
+
+  renderRangeBrackets() {
+    const bracketRow = document.getElementById('range-bracket-row');
+    const labelsRow = document.getElementById('range-labels');
+    if (!bracketRow || !labelsRow) return;
+
+    if (!this.isDivideConquer || !this.activeRange) {
+      bracketRow.innerHTML = '';
+      labelsRow.innerHTML = '';
+      return;
+    }
+
+    const n = this.currentValues.length;
+    const [left, right] = this.activeRange;
+    const barWidth = 100 / n;
+
+    // Range bracket
+    const bracketLeft = left * barWidth;
+    const bracketWidth = (right - left + 1) * barWidth;
+
+    let bracketHtml = `<div class="range-bracket" style="left: ${bracketLeft}%; width: ${bracketWidth}%;">
+      <div class="range-bracket-label">[${left}..${right}] depth=${this.activeDepth}</div>
+    </div>`;
+
+    // Show midpoint divider if applicable
+    if (this.activeMidPoint !== null && this.activeMidPoint >= left && this.activeMidPoint < right) {
+      const midPos = (this.activeMidPoint + 1) * barWidth;
+      bracketHtml += `<div class="mid-divider" style="left: ${midPos}%;"></div>`;
+    }
+
+    bracketRow.innerHTML = bracketHtml;
+
+    // Range labels above
+    if (this.activeMidPoint !== null && this.activeMidPoint >= left && this.activeMidPoint < right) {
+      const leftPartEnd = this.activeMidPoint;
+      const rightPartStart = this.activeMidPoint + 1;
+
+      const leftLabelLeft = left * barWidth;
+      const leftLabelWidth = (leftPartEnd - left + 1) * barWidth;
+      const rightLabelLeft = rightPartStart * barWidth;
+      const rightLabelWidth = (right - rightPartStart + 1) * barWidth;
+
+      labelsRow.innerHTML = `
+        <div class="range-half-label left" style="left: ${leftLabelLeft}%; width: ${leftLabelWidth}%;">
+          ↙ Trái [${left}..${leftPartEnd}]
+        </div>
+        <div class="range-half-label right" style="left: ${rightLabelLeft}%; width: ${rightLabelWidth}%;">
+          ↘ Phải [${rightPartStart}..${right}]
+        </div>
+      `;
+    } else {
+      labelsRow.innerHTML = '';
+    }
   }
 
   stepForward() {
@@ -291,6 +412,9 @@ class Visualizer {
     this.sortedIndices = new Set();
     this.comparisons = 0;
     this.swapsCount = 0;
+    this.activeRange = null;
+    this.activeDepth = 0;
+    this.activeMidPoint = null;
 
     const targetStep = this.currentStep - 1;
     this.currentStep = -1;
@@ -317,6 +441,17 @@ class Visualizer {
     if (!step) return;
 
     const highlights = {};
+
+    // Update active range for D&C algorithms
+    if (step.range) {
+      this.activeRange = step.range;
+      this.activeDepth = step.depth || 0;
+    }
+
+    // Handle midpoint
+    if (step.midPoint !== undefined) {
+      this.activeMidPoint = step.midPoint;
+    }
 
     switch (step.type) {
       case 'compare':
@@ -346,8 +481,36 @@ class Visualizer {
       case 'pivot':
         highlights.pivot = step.indices;
         break;
+      case 'divide':
+        // Show the range being divided
+        highlights.comparing = step.indices;
+        break;
+      case 'recurse-left':
+        highlights.divideLeft = step.indices;
+        this.activeMidPoint = null;
+        break;
+      case 'recurse-right':
+        highlights.divideRight = step.indices;
+        this.activeMidPoint = null;
+        break;
+      case 'merge-start':
+        highlights.comparing = step.indices;
+        break;
+      case 'merge-done':
+        // Mark merged range as temporarily highlighted
+        highlights.merge = step.indices;
+        break;
+      case 'base-case':
+        highlights.baseCase = step.indices;
+        this.sortedIndices.add(step.indices[0]);
+        break;
+      case 'partition-done':
+        highlights.pivot = step.indices;
+        this.sortedIndices.add(step.indices[0]);
+        break;
       case 'done':
-        // Mark all as sorted
+        this.activeRange = null;
+        this.activeMidPoint = null;
         for (let i = 0; i < this.currentValues.length; i++) {
           this.sortedIndices.add(i);
         }
@@ -355,14 +518,25 @@ class Visualizer {
     }
 
     this.renderBars(highlights);
+    this.renderRangeBrackets();
     this.updateStepInfo();
     this.updateStats();
     this.updatePseudocode(step.line);
+    this.updateDCContext(step);
+    this.updateRecursionTree(step);
   }
 
   applyStepSilent(stepIndex) {
     const step = this.steps[stepIndex];
     if (!step) return;
+
+    if (step.range) {
+      this.activeRange = step.range;
+      this.activeDepth = step.depth || 0;
+    }
+    if (step.midPoint !== undefined) {
+      this.activeMidPoint = step.midPoint;
+    }
 
     switch (step.type) {
       case 'compare':
@@ -383,10 +557,22 @@ class Visualizer {
       case 'sorted':
         step.indices.forEach(i => this.sortedIndices.add(i));
         break;
+      case 'base-case':
+        this.sortedIndices.add(step.indices[0]);
+        break;
+      case 'partition-done':
+        this.sortedIndices.add(step.indices[0]);
+        break;
       case 'done':
+        this.activeRange = null;
+        this.activeMidPoint = null;
         for (let i = 0; i < this.currentValues.length; i++) {
           this.sortedIndices.add(i);
         }
+        break;
+      case 'recurse-left':
+      case 'recurse-right':
+        this.activeMidPoint = null;
         break;
     }
   }
@@ -441,10 +627,15 @@ class Visualizer {
     this.sortedIndices = new Set();
     this.comparisons = 0;
     this.swapsCount = 0;
+    this.activeRange = null;
+    this.activeDepth = 0;
+    this.activeMidPoint = null;
     this.renderBars();
+    this.renderRangeBrackets();
     this.updateStepInfo();
     this.updateStats();
     this.updatePseudocode(-1);
+    this.updateDCContext(null);
   }
 
   skipToEnd() {
@@ -455,6 +646,9 @@ class Visualizer {
     this.sortedIndices = new Set();
     this.comparisons = 0;
     this.swapsCount = 0;
+    this.activeRange = null;
+    this.activeDepth = 0;
+    this.activeMidPoint = null;
 
     // Apply all steps silently
     for (let i = 0; i < this.steps.length; i++) {
@@ -468,6 +662,7 @@ class Visualizer {
     }
 
     this.renderBars();
+    this.renderRangeBrackets();
     this.updateStepInfo();
     this.updateStats();
   }
@@ -533,6 +728,164 @@ class Visualizer {
       const isActive = idx === activeLine;
       return `<div class="pseudocode-line ${isActive ? 'active' : ''}">${line}</div>`;
     }).join('');
+  }
+
+  updateDCContext(step) {
+    const ctx = document.getElementById('dc-context');
+    if (!ctx) return;
+
+    if (!this.isDivideConquer || !step || !step.range) {
+      ctx.style.display = 'none';
+      return;
+    }
+
+    ctx.style.display = 'flex';
+
+    const depthEl = document.getElementById('dc-depth');
+    const rangeEl = document.getElementById('dc-range');
+    const phaseEl = document.getElementById('dc-phase');
+
+    if (depthEl) {
+      depthEl.textContent = step.depth ?? this.activeDepth;
+      // Color code depth
+      const colors = ['#22d3ee', '#a78bfa', '#f472b6', '#fbbf24', '#34d399', '#fb923c'];
+      depthEl.style.color = colors[Math.min(step.depth ?? 0, colors.length - 1)];
+    }
+
+    if (rangeEl) {
+      const [l, r] = step.range;
+      rangeEl.textContent = `[${l}..${r}] (${r - l + 1} phần tử)`;
+    }
+
+    if (phaseEl) {
+      const phaseMap = {
+        'divide': '✂ DIVIDE - Chia mảng',
+        'recurse-left': '↙ ĐỆ QUY TRÁI',
+        'recurse-right': '↘ ĐỆ QUY PHẢI',
+        'merge-start': '⤵ CONQUER - Trộn',
+        'merge': '⤵ Đang trộn...',
+        'merge-done': '✓ Đã trộn xong',
+        'compare': '🔍 So sánh',
+        'swap': '🔄 Hoán đổi',
+        'pivot': '🎯 Chọn Pivot',
+        'partition-done': '✓ Phân hoạch xong',
+        'base-case': '■ Base Case',
+        'sorted': '✓ Đã sắp xếp',
+        'info': 'ℹ Thông tin'
+      };
+      phaseEl.textContent = phaseMap[step.type] || step.type;
+
+      // Color the phase
+      const phaseColors = {
+        'divide': '#f472b6',
+        'recurse-left': '#a78bfa',
+        'recurse-right': '#a78bfa',
+        'merge-start': '#22d3ee',
+        'merge': '#22d3ee',
+        'merge-done': '#34d399',
+        'compare': '#fbbf24',
+        'swap': '#fb923c',
+        'pivot': '#c084fc',
+        'partition-done': '#34d399',
+        'base-case': '#94a3b8'
+      };
+      phaseEl.style.color = phaseColors[step.type] || 'var(--text-secondary)';
+    }
+  }
+
+  updateRecursionTree(step) {
+    const tree = document.getElementById('recursion-tree');
+    const treeCard = document.getElementById('recursion-tree-card');
+    if (!tree || !treeCard) return;
+
+    if (!this.isDivideConquer) {
+      treeCard.style.display = 'none';
+      return;
+    }
+
+    treeCard.style.display = 'block';
+
+    if (!step || !step.range) {
+      tree.innerHTML = '<span style="color: var(--text-muted);">Chưa bắt đầu...</span>';
+      return;
+    }
+
+    const [l, r] = step.range;
+    const depth = step.depth ?? 0;
+    const indent = '  '.repeat(depth);
+    const depthColors = ['#22d3ee', '#a78bfa', '#f472b6', '#fbbf24', '#34d399', '#fb923c'];
+    const color = depthColors[Math.min(depth, depthColors.length - 1)];
+
+    let icon = '';
+    let label = '';
+
+    switch (step.type) {
+      case 'divide':
+        icon = '✂';
+        label = `DIVIDE [${l}..${r}]`;
+        break;
+      case 'recurse-left':
+        icon = '↙';
+        label = `LEFT [${l}..${r}]`;
+        break;
+      case 'recurse-right':
+        icon = '↘';
+        label = `RIGHT [${l}..${r}]`;
+        break;
+      case 'merge-start':
+        icon = '⤵';
+        label = `MERGE [${l}..${step.midPoint}] + [${(step.midPoint||0)+1}..${r}]`;
+        break;
+      case 'merge-done':
+        icon = '✓';
+        label = `MERGED [${l}..${r}]`;
+        break;
+      case 'base-case':
+        icon = '■';
+        label = `BASE [${l}]=${this.currentValues[l]}`;
+        break;
+      case 'pivot':
+        icon = '🎯';
+        label = `PIVOT @ [${l}..${r}]`;
+        break;
+      case 'partition-done':
+        icon = '✓';
+        label = `PARTITIONED → pivot@${step.pivotIndex}`;
+        break;
+      default:
+        icon = '·';
+        label = `[${l}..${r}] ${step.type}`;
+    }
+
+    // Build a visual representation of current context
+    const depthBar = Array.from({ length: depth + 1 }, (_, d) => {
+      const c = depthColors[Math.min(d, depthColors.length - 1)];
+      return `<span style="color: ${c};">│</span>`;
+    }).join('');
+
+    // Show current step context + array state for the range
+    const rangeValues = this.currentValues.slice(l, r + 1).map(v => 
+      typeof v === 'number' ? (v % 1 === 0 ? v : v.toFixed(1)) : v
+    );
+
+    tree.innerHTML = `
+      <div style="margin-bottom: 6px;">
+        <span style="color: var(--text-muted);">Depth:</span>
+        ${Array.from({ length: depth + 1 }, (_, d) => {
+          const c = depthColors[Math.min(d, depthColors.length - 1)];
+          return `<span style="display: inline-block; width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 4px; background: ${c}20; color: ${c}; font-size: 0.7rem; margin-right: 2px;">${d}</span>`;
+        }).join('')}
+      </div>
+      <div style="color: ${color}; font-weight: 600; margin-bottom: 4px;">
+        ${icon} ${label}
+      </div>
+      <div style="color: var(--text-muted); font-size: 0.75rem;">
+        Mảng con: [${rangeValues.join(', ')}]
+      </div>
+      ${step.midPoint !== undefined ? `<div style="color: var(--text-muted); font-size: 0.75rem; margin-top: 2px;">
+        Mid: ${step.midPoint} → Trái[${l}..${step.midPoint}] | Phải[${step.midPoint+1}..${r}]
+      </div>` : ''}
+    `;
   }
 }
 

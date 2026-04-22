@@ -839,6 +839,35 @@ input[type="range"]::-webkit-slider-thumb:hover {
   box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
 }
 
+.bar.merge-highlight {
+  background: var(--accent-cyan) !important;
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.6);
+}
+
+.bar.base-case {
+  background: var(--accent-green) !important;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+}
+
+.bar.divide-left {
+  background: var(--accent-purple-light) !important;
+  box-shadow: 0 0 10px rgba(167, 139, 250, 0.5);
+}
+
+.bar.divide-right {
+  background: var(--accent-pink) !important;
+  box-shadow: 0 0 10px rgba(236, 72, 153, 0.5);
+}
+
+.bar.dimmed {
+  opacity: 0.2;
+  filter: grayscale(0.5);
+}
+
+.bar.midpoint {
+  border-right: 2px solid var(--accent-pink) !important;
+}
+
 .bar .bar-value {
   position: absolute;
   top: -18px;
@@ -1033,6 +1062,122 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .legend-color.swapping { background: var(--accent-red); }
 .legend-color.sorted { background: var(--accent-green); }
 .legend-color.pivot { background: var(--accent-purple); }
+.legend-color.range-active { background: linear-gradient(135deg, var(--accent-purple-light), var(--accent-pink)); }
+
+/* ---------- Divide & Conquer Range Visualization ---------- */
+
+/* Range bracket below bars */
+.range-bracket-row {
+  position: relative;
+  height: 28px;
+  margin-top: 2px;
+}
+
+.range-bracket {
+  position: absolute;
+  top: 0;
+  height: 20px;
+  border: 2px solid var(--accent-purple-light);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  background: rgba(167, 139, 250, 0.06);
+  transition: all 0.2s ease;
+}
+
+.range-bracket-label {
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  color: var(--accent-purple-light);
+  white-space: nowrap;
+  background: var(--bg-secondary);
+  padding: 0 6px;
+  border-radius: 3px;
+}
+
+/* Midpoint divider */
+.mid-divider {
+  position: absolute;
+  top: -350px;
+  height: 370px;
+  width: 2px;
+  background: repeating-linear-gradient(
+    180deg,
+    var(--accent-pink) 0px,
+    var(--accent-pink) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  opacity: 0.6;
+  z-index: 5;
+  pointer-events: none;
+  transition: left 0.2s ease;
+}
+
+/* Range labels above bars */
+.range-labels {
+  position: relative;
+  height: 22px;
+  margin-bottom: 2px;
+}
+
+.range-half-label {
+  position: absolute;
+  top: 0;
+  text-align: center;
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 2px 0;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.range-half-label.left {
+  color: var(--accent-purple-light);
+  background: rgba(167, 139, 250, 0.08);
+  border-bottom: 2px solid var(--accent-purple-light);
+}
+
+.range-half-label.right {
+  color: var(--accent-pink);
+  background: rgba(236, 72, 153, 0.08);
+  border-bottom: 2px solid var(--accent-pink);
+}
+
+/* Divide & Conquer context panel */
+.dc-context {
+  display: flex;
+  gap: var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(139, 92, 246, 0.06);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-radius: var(--radius-md);
+  margin-top: var(--space-sm);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.dc-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.8rem;
+}
+
+.dc-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.dc-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-purple-light);
+}
 
 /* ---------- Benchmark ---------- */
 .benchmark-results {
