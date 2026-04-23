@@ -13,6 +13,13 @@ function getRandomFloat(min, max, decimals) {
   return parseFloat(str);
 }
 
+function getBiasedRating() {
+  const rand = Math.random();
+  if (rand < 0.05) return getRandomFloat(3.5, 4.0, 1);
+  if (rand < 0.15) return getRandomFloat(4.0, 4.5, 1);
+  return getRandomFloat(4.5, 5.0, 1);
+}
+
 function generateName() {
   const prefix = prefixes[getRandomInt(0, prefixes.length - 1)];
   const brand = brands[getRandomInt(0, brands.length - 1)];
@@ -45,7 +52,7 @@ for (let i = 1; i <= numProducts; i++) {
     id: i,
     name: generateName(),
     price: basePrice,
-    rating: getRandomFloat(1, 5, 1),
+    rating: getBiasedRating(),
     stock: getRandomInt(0, 500),
     isComparing: false,
     isSwapping: false,

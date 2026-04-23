@@ -593,7 +593,7 @@ class DataTable {
   updateStats() {
     // Update hero stats
     const totalProducts = document.getElementById('stat-total-products');
-    if (totalProducts) totalProducts.textContent = this.allData.length;
+    if (totalProducts) totalProducts.textContent = this.allData.length.toLocaleString('vi-VN');
 
     const avgPrice = document.getElementById('stat-avg-price');
     if (avgPrice) {
