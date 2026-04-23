@@ -14,7 +14,7 @@ class Visualizer {
     this.playTimer = null;
     this.speed = 5; // 1-10 scale
     this.algorithm = 'selection';
-    this.sortField = 'price';
+    this.sortField = null; // Will be set in init()
     this.sortOrder = 'asc';
     this.sampleSize = 30;
     this.sortedIndices = new Set();
@@ -22,16 +22,37 @@ class Visualizer {
     this.swapsCount = 0;
     this.dataType = 'random';
     this.result = null;
+    this.datasetId = 'ecommerce';
 
     // Advanced Insights
     this.accessCount = [];     // for heatmap
     this.comparativeCosts = {}; // { algo: stepCount }
+    this.isInitialized = false;
   }
 
-  init(allData) {
-    this.allData = allData;
-    this.render();
-    this.bindEvents();
+  // Helper to wrap primitive values into objects for metadata tracking
+  wrapValue(v, label = null) {
+    if (v === null || v === undefined) return v;
+    const obj = new Number(v);
+    obj.label = label !== null ? label : v;
+    return obj;
+  }
+
+  init(data) {
+    this.allData = data;
+    
+    if (!this.sortField) {
+      const config = DatasetManager.getDataset(this.datasetId);
+      if (config && config.fields.length > 0) {
+        this.sortField = config.fields[0].id;
+      }
+    }
+
+    if (!this.isInitialized) {
+      this.render();
+      this.bindEvents();
+      this.isInitialized = true;
+    }
     this.generateSample();
   }
 
@@ -58,9 +79,7 @@ class Visualizer {
         <div class="control-group">
           <label>Trường sắp xếp:</label>
           <select id="vis-field-select">
-            <option value="price">Giá (Price)</option>
-            <option value="rating">Đánh giá (Rating)</option>
-            <option value="stock">Tồn kho (Stock)</option>
+            ${DatasetManager.getDataset(this.datasetId).fields.map(f => `<option value="${f.id}" ${f.id === this.sortField ? 'selected' : ''}>${f.label}</option>`).join('')}
           </select>
         </div>
 
@@ -290,6 +309,42 @@ class Visualizer {
   }
 
   bindEvents() {
+    // Tooltip logic
+    let tooltip = document.querySelector('.custom-tooltip');
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.className = 'custom-tooltip';
+      document.body.appendChild(tooltip);
+    }
+
+    const chart = document.getElementById('bar-chart');
+    if (chart) {
+      chart.addEventListener('mousemove', (e) => {
+        const bar = e.target.closest('.bar');
+        if (bar && bar.dataset.tooltip) {
+          tooltip.innerHTML = bar.dataset.tooltip;
+          tooltip.style.display = 'block';
+          
+          // Position tooltip relative to mouse
+          const x = e.clientX + 15;
+          const y = e.clientY + 15;
+          
+          // Keep within viewport
+          const spaceX = window.innerWidth - x;
+          const spaceY = window.innerHeight - y;
+          
+          tooltip.style.left = (spaceX < 260 ? x - 270 : x) + 'px';
+          tooltip.style.top = (spaceY < 200 ? y - 150 : y) + 'px';
+        } else {
+          tooltip.style.display = 'none';
+        }
+      });
+
+      chart.addEventListener('mouseleave', () => {
+        tooltip.style.display = 'none';
+      });
+    }
+
     // Algorithm selection
     document.getElementById('vis-algo-grid')?.addEventListener('click', (e) => {
       const card = e.target.closest('.algo-info-card');
@@ -375,25 +430,40 @@ class Visualizer {
     // Generate sample based on data type
     const shuffled = [...this.allData].sort(() => Math.random() - 0.5);
     const sample = shuffled.slice(0, this.sampleSize);
-    this.originalData = sample.map(d => d[this.sortField]);
-    this.currentValues = [...this.originalData];
-
-    // Ensure all values are numeric and auto-format as currency for algorithm descriptions
+    
+    // Map values for visualization (handle text ranking)
+    const fieldConfig = DatasetManager.getDataset(this.datasetId).fields.find(f => f.id === this.sortField);
     const isPrice = this.sortField === 'price';
-    const wrapValue = (v) => {
+    const isString = fieldConfig && fieldConfig.type === 'string';
+
+    const localWrapValue = (v, item) => {
       const num = Number(v);
       const obj = new Number(num);
+      obj.item = item;
+      obj.label = item ? item[this.sortField] : v;
       obj.toString = function() {
+        if (this.label && isString) return this.label;
         if (isPrice) return this.valueOf().toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
         return this.valueOf() % 1 === 0 ? this.valueOf().toString() : this.valueOf().toFixed(1);
       };
       return obj;
     };
 
-    let values = this.originalData.map(Number);
+    let values;
+    if (isString) {
+      const uniqueSorted = [...new Set(sample.map(d => d[this.sortField]))].sort((a, b) => String(a).localeCompare(String(b)));
+      values = sample.map(d => {
+        const text = d[this.sortField];
+        const rank = uniqueSorted.indexOf(text) + 1;
+        return localWrapValue(rank, d);
+      });
+    } else {
+      values = sample.map(d => localWrapValue(Number(d[this.sortField]), d));
+    }
+
     switch (this.dataType) {
       case 'nearly':
-        values.sort((a, b) => this.sortOrder === 'asc' ? a - b : b - a);
+        values.sort((a, b) => (this.sortOrder === 'asc' ? a - b : b - a));
         const numSwaps = Math.max(1, Math.floor(values.length * 0.05));
         for (let s = 0; s < numSwaps; s++) {
           const a = Math.floor(Math.random() * values.length);
@@ -402,27 +472,29 @@ class Visualizer {
         }
         break;
       case 'reversed':
-        values.sort((a, b) => this.sortOrder === 'asc' ? b - a : a - b);
+        values.sort((a, b) => (this.sortOrder === 'asc' ? b - a : a - b));
         break;
       case 'few':
-        const uniques = [...new Set(values)].slice(0, 5);
-        values = values.map(() => uniques[Math.floor(Math.random() * uniques.length)]);
+        const uniques = [...new Set(values.map(v => Number(v)))].slice(0, 5);
+        values = values.map((v) => {
+          const newVal = uniques[Math.floor(Math.random() * uniques.length)];
+          return localWrapValue(newVal, v.label);
+        });
         break;
       case 'stability-test':
-        // Generate only 3 distinct values, repeated
         const dist = [10000, 20000, 30000];
-        values = values.map(() => dist[Math.floor(Math.random() * dist.length)]);
+        values = values.map((v, i) => {
+          const val = dist[Math.floor(Math.random() * dist.length)];
+          const obj = localWrapValue(val, v.label);
+          obj._originalIndex = i;
+          obj._colorHue = (val / 30000) * 360;
+          return obj;
+        });
         break;
     }
 
-    this.currentValues = values.map((v, i) => {
-      const obj = wrapValue(v);
-      if (this.dataType === 'stability-test') {
-        obj._originalIndex = i;
-        obj._colorHue = (v / 30000) * 360; // unique hue per value group
-      }
-      return obj;
-    });
+    this.currentValues = values;
+    this.originalData = [...this.currentValues];
     this.originalData = [...this.currentValues];
 
     // Run algorithm to get steps
@@ -584,6 +656,9 @@ class Visualizer {
 
     const maxVal = Math.max(...this.currentValues, 1);
     const n = this.currentValues.length;
+    const fieldConfig = DatasetManager.getDataset(this.datasetId).fields.find(f => f.id === this.sortField);
+    const isString = fieldConfig && fieldConfig.type === 'string';
+    const isPrice = this.sortField === 'price';
     
     // Tự động điều chỉnh khoảng cách và kích thước thanh để chống tràn (bể giao diện)
     chart.style.gap = n > 200 ? '0px' : (n > 50 ? '1px' : '2px');
@@ -627,16 +702,64 @@ class Visualizer {
         displayVal = val.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
       }
 
-      // Custom style for Stability Test
+      // Custom style for Stability Test or String Sorting
       let customStyle = '';
       let extraLabelHtml = '';
+      
       if (this.dataType === 'stability-test' && val._originalIndex !== undefined) {
         customStyle = `background: hsl(${val._colorHue || 0}, 70%, 50%) !important;`;
         extraLabelHtml = `<div style="position: absolute; bottom: 5px; width: 100%; text-align: center; color: white; font-weight: bold; font-size: 10px; text-shadow: 0 1px 2px black;">#${val._originalIndex}</div>`;
+      } else if (isString && val.label) {
+        const charCode = val.label.charCodeAt(0) || 0;
+        const hue = (charCode * 137.5) % 360;
+        customStyle = `background: hsl(${hue}, 60%, 45%) !important;`;
+        
+        // Dynamic labels based on high-precision dimension calculations
+        const chartRect = chart.getBoundingClientRect();
+        const chartW = chartRect.width || chart.clientWidth || 800;
+        const chartH = chartRect.height || chart.clientHeight || 400;
+        
+        const barWidth = chartW / n;
+        const actualBarHeightPx = (height / 100) * chartH;
+        
+        const fontSize = Math.max(8, Math.min(11, barWidth * 0.7));
+        const maxWidth = n > 12 ? '150px' : (barWidth - 2) + 'px';
+        
+        // Strictly hide label if bar is too short (under 50% height) or too narrow (under 20px)
+        if (barWidth > 20 && height >= 50) {
+          extraLabelHtml = `<div class="bar-text-label" style="
+            font-size: ${fontSize}px;
+            max-width: ${maxWidth};
+          ">${val.label}</div>`;
+        } else {
+          extraLabelHtml = '';
+        }
       }
 
-      return `<div class="${cls}" style="height: ${Math.max(height, 2)}%; min-width: ${minWidth}; ${customStyle}" data-index="${i}" id="bar-${i}">
-        <span class="bar-value">${displayVal}</span>
+      // Prepare Tooltip Data
+      const dataset = DatasetManager.getDataset(this.datasetId);
+      let tooltipContent = `<div class="tooltip-title">${val.label || 'Phần tử'}</div>`;
+      if (val.item) {
+        dataset.fields.forEach(f => {
+          let fVal = val.item[f.id];
+          if (f.type === 'number' && f.id === 'price') fVal = fVal.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+          tooltipContent += `
+            <div class="tooltip-row">
+              <span class="tooltip-label">${f.label}:</span>
+              <span class="tooltip-value">${fVal}</span>
+            </div>
+          `;
+        });
+      }
+
+      // Only show labels/badges if bar is wide enough
+      const barWidth = chart.clientWidth / n;
+      const showLabels = barWidth > 35;
+      const showSmallLabels = barWidth > 15;
+
+      return `<div class="${cls}" style="height: ${Math.max(height, 2)}%; min-width: ${minWidth}; ${customStyle}" 
+                   data-index="${i}" id="bar-${i}" data-tooltip='${tooltipContent.replace(/'/g, "&apos;")}'>
+        <span class="bar-value">${isString ? '' : displayVal}</span>
         ${extraLabelHtml}
         ${highlightIndices.comparing?.includes(i) ? '<div class="bar-pointer">▼</div>' : ''}
         ${highlightIndices.currentMin?.includes(i) ? '<div class="bar-min-badge">MIN</div>' : ''}
@@ -1651,6 +1774,13 @@ class Visualizer {
   hideLoopTracker() {
     const panel = document.getElementById('loop-tracker');
     if (panel) panel.classList.remove('panel-visible');
+  }
+  updateFields(fields) {
+    const selector = document.getElementById('vis-field-select');
+    if (selector) {
+      selector.innerHTML = fields.map(f => `<option value="${f.id}">${f.label}</option>`).join('');
+      this.sortField = fields[0].id;
+    }
   }
 }
 

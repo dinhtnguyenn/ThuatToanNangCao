@@ -13,17 +13,38 @@ class Race {
     this.speed = 5; // 1-10
 
     this.sampleSize = 30;
-    this.sortField = 'price';
+    this.sortField = 'id';
     this.sortOrder = 'asc';
     this.dataType = 'random';
 
     this.algorithms = ['selection', 'insertion', 'bubble', 'merge', 'quick'];
     this.runners = []; // Stores state for each algorithm
     this.ranks = [];
+    this.datasetId = 'ecommerce';
+    this.sortField = null; // Will be set in init()
+  }
+
+  updateFields(fields) {
+    const selector = document.getElementById('race-field-select');
+    if (selector) {
+      selector.innerHTML = fields.map(f => `<option value="${f.id}">${f.label}</option>`).join('');
+      if (!this.sortField || !fields.find(f => f.id === this.sortField)) {
+        this.sortField = fields[0].id;
+      }
+      selector.value = this.sortField;
+    }
   }
 
   init(data) {
     this.allData = data;
+
+    if (!this.sortField) {
+      const config = DatasetManager.getDataset(this.datasetId);
+      if (config && config.fields.length > 0) {
+        this.sortField = config.fields[0].id;
+      }
+    }
+
     this.render();
     this.bindEvents();
     this.generateSample();
@@ -35,9 +56,7 @@ class Race {
         <div class="control-group">
           <label>Trường sắp xếp:</label>
           <select id="race-field-select">
-            <option value="price">Giá (Price)</option>
-            <option value="rating">Đánh giá (Rating)</option>
-            <option value="stock">Tồn kho (Stock)</option>
+            ${DatasetManager.getDataset(this.datasetId).fields.map(f => `<option value="${f.id}" ${f.id === this.sortField ? 'selected' : ''}>${f.label}</option>`).join('')}
           </select>
         </div>
 
@@ -154,7 +173,17 @@ class Race {
     // Generate base array
     const shuffled = [...this.allData].sort(() => Math.random() - 0.5);
     const sample = shuffled.slice(0, this.sampleSize);
-    let values = sample.map(item => Number(item[this.sortField]));
+    
+    const fieldConfig = DatasetManager.getDataset(this.datasetId).fields.find(f => f.id === this.sortField);
+    const isString = fieldConfig && fieldConfig.type === 'string';
+
+    let values;
+    if (isString) {
+      const uniqueSorted = [...new Set(sample.map(d => d[this.sortField]))].sort((a, b) => String(a).localeCompare(String(b)));
+      values = sample.map(d => uniqueSorted.indexOf(d[this.sortField]) + 1);
+    } else {
+      values = sample.map(item => Number(item[this.sortField]));
+    }
 
     switch (this.dataType) {
       case 'nearly':

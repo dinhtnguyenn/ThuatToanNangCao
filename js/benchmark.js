@@ -7,11 +7,12 @@ class Benchmark {
     this.container = document.getElementById(containerId);
     this.allData = [];
     this.sampleSize = 200;
-    this.sortField = 'price';
+    this.sortField = 'id';
     this.sortOrder = 'asc';
     this.dataType = 'random';
     this.results = [];
     this.isRunning = false;
+    this.datasetId = 'ecommerce';
   }
 
   init(allData) {
@@ -41,9 +42,7 @@ class Benchmark {
         <div class="control-group">
           <label>Sắp xếp theo:</label>
           <select id="bench-field-select">
-            <option value="price">Giá (Price)</option>
-            <option value="rating">Đánh giá (Rating)</option>
-            <option value="stock">Tồn kho (Stock)</option>
+            ${DatasetManager.getDataset(this.datasetId).fields.map(f => `<option value="${f.id}" ${f.id === this.sortField ? 'selected' : ''}>${f.label}</option>`).join('')}
           </select>
         </div>
 
@@ -642,6 +641,14 @@ class Benchmark {
     document.body.removeChild(link);
     
     if (window.app) window.app.showToast('Đã xuất báo cáo CSV thành công', 'success');
+  }
+  updateFields(fields) {
+    const selector = document.getElementById('bench-field-select');
+    if (selector) {
+      const numericFields = fields.filter(f => f.type === 'number');
+      selector.innerHTML = numericFields.map(f => `<option value="${f.id}">${f.label}</option>`).join('');
+      this.sortField = numericFields.length > 0 ? numericFields[0].id : 'id';
+    }
   }
 }
 

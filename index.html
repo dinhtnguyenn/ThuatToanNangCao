@@ -63,8 +63,18 @@
         </div>
       </nav>
 
-      <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
-        <span><i class="fa-solid fa-keyboard"></i></span> 1/2/3 chuyển tab • Space play • ← → bước
+      <div class="navbar-right">
+        <!-- DATASET SELECTOR -->
+        <div class="dataset-selector-container">
+          <label for="global-dataset-select"><i class="fa-solid fa-layer-group"></i></label>
+          <select id="global-dataset-select" class="dataset-select">
+            <!-- Options populated by app.js -->
+          </select>
+        </div>
+
+        <div class="keyboard-shortcuts-info">
+          <span><i class="fa-solid fa-keyboard"></i></span> 1-5 chuyển tab
+        </div>
       </div>
     </div>
   </nav>
@@ -81,20 +91,24 @@
 
       <div class="stats-grid">
         <div class="stat-card">
+          <div class="stat-icon"><i class="fa-solid fa-database"></i></div>
           <div class="stat-value" id="stat-total-products">0</div>
-          <div class="stat-label">Sản phẩm</div>
+          <div class="stat-label">Tổng số mục</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value">5</div>
-          <div class="stat-label">Thuật toán</div>
+          <div class="stat-icon"><i class="fa-solid fa-bolt"></i></div>
+          <div class="stat-value" id="stat-avg-price">0</div>
+          <div class="stat-label">Trung bình</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value" id="stat-avg-price" style="font-size: 1.4rem;">0 ₫</div>
-          <div class="stat-label">Giá trung bình</div>
-        </div>
-        <div class="stat-card">
+          <div class="stat-icon"><i class="fa-solid fa-chart-line"></i></div>
           <div class="stat-value" id="stat-avg-rating">0</div>
-          <div class="stat-label">Rating TB</div>
+          <div class="stat-label">Trung bình</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon"><i class="fa-solid fa-check-circle"></i></div>
+          <div class="stat-value" id="stat-total-stock">Sẵn sàng</div>
+          <div class="stat-label">Trạng thái</div>
         </div>
       </div>
     </section>
@@ -252,6 +266,7 @@
   <!-- ========== SCRIPTS ========== -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="js/algorithms.js"></script>
+  <script src="js/dataManager.js"></script>
   <script src="js/dataTable.js"></script>
   <script src="js/visualizer.js"></script>
   <script src="js/benchmark.js"></script>

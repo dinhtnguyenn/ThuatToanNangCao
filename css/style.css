@@ -2846,6 +2846,47 @@ input[type="range"]::-webkit-slider-thumb:hover {
     right: auto !important; 
     top: 20px !important; 
   }
+
+  .dataset-selector-container {
+    width: 100%;
+    justify-content: space-between;
+    padding: 10px;
+    background: var(--bg-glass);
+    border-radius: var(--radius-md);
+  }
+}
+
+/* Dataset Selector Styles */
+.dataset-selector-container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.dataset-selector-container label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.dataset-select {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+.dataset-select option {
+  background: var(--bg-body);
+  color: var(--text-primary);
 }
 
 
@@ -2970,4 +3011,282 @@ input[type="range"]::-webkit-slider-thumb:hover {
   .growth-chart-wrapper {
     height: 250px;
   }
+}
+
+/* ============================================
+   NAVBAR REFACTOR & FIX
+   ============================================ */
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.keyboard-shortcuts-info {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+@media (max-width: 1200px) {
+  .nav-tab span:not(.tab-icon) {
+    display: none;
+  }
+  .nav-tab {
+    padding: var(--space-sm);
+  }
+}
+
+@media (max-width: 900px) {
+  .navbar-inner {
+    flex-wrap: wrap;
+    height: auto !important;
+    padding: var(--space-sm) var(--space-md);
+  }
+  
+  .nav-tabs {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    border-top: 1px solid var(--border-color);
+    margin-top: var(--space-sm);
+    padding-top: var(--space-sm);
+  }
+
+  .navbar-right {
+    order: 2;
+  }
+  
+  .keyboard-shortcuts-info {
+    display: none;
+  }
+}
+
+/* ============================================
+   ULTIMATE NAVBAR LAYOUT FIX
+   ============================================ */
+
+.navbar {
+  height: auto !important;
+  min-height: 64px !important;
+  padding: 0 var(--space-md) !important;
+}
+
+.navbar-inner {
+  height: auto !important;
+  min-height: 64px !important;
+  display: flex !important;
+  flex-wrap: nowrap !important; /* Prevent total breakage, use inner scrolling instead */
+  align-items: center !important;
+  gap: var(--space-md) !important;
+}
+
+.navbar-brand {
+  flex-shrink: 0 !important;
+  margin-right: var(--space-md) !important;
+}
+
+.nav-tabs {
+  flex-grow: 1 !important;
+  display: flex !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE/Edge */
+  white-space: nowrap !important;
+  mask-image: linear-gradient(to right, black 90%, transparent 100%);
+}
+
+.nav-tabs::-webkit-scrollbar {
+  display: none !important; /* Chrome/Safari */
+}
+
+.navbar-right {
+  flex-shrink: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--space-sm) !important;
+  margin-left: auto !important;
+}
+
+@media (max-width: 1024px) {
+  .keyboard-shortcuts-info {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar-inner {
+    padding: 8px 0 !important;
+  }
+  
+  .navbar-brand {
+    font-size: 1.1rem !important;
+  }
+  
+  .dataset-selector-container {
+    padding: 4px 8px !important;
+  }
+}
+
+/* Ensure content doesn't get hidden behind sticky navbar */
+.main-container {
+  padding-top: 20px !important;
+}
+
+
+.stat-icon {
+  font-size: 1.5rem;
+  margin-bottom: var(--space-xs);
+  opacity: 0.8;
+  color: var(--accent-cyan-light);
+}
+
+/* ============================================
+   STATS GRID & CARD POLISH
+   ============================================ */
+
+.stats-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  gap: var(--space-md) !important;
+  max-width: 1100px !important;
+}
+
+.stat-card {
+  min-height: 120px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  padding: var(--space-md) !important;
+}
+
+.stat-value {
+  font-size: 1.6rem !important; /* Slightly smaller for better fit */
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+@media (max-width: 768px) {
+  .stat-value {
+    font-size: 1.4rem !important;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+}
+
+/* Text labels on visualizer bars */
+.bar-text-label {
+    position: absolute;
+    width: auto;
+    left: 50%;
+    transform-origin: center center;
+    text-align: center;
+    color: white;
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: transform 0.3s ease, bottom 0.3s ease;
+    z-index: 5;
+    transform: translateX(-50%); /* Better centering */
+}
+
+/* Hover effects for bars */
+.bar:hover {
+    filter: brightness(1.2);
+    z-index: 100;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+    cursor: help;
+}
+
+.bar-chart:hover .bar:not(:hover) {
+    opacity: 0.6;
+    filter: grayscale(0.2) brightness(0.8);
+}
+
+.bar:hover .bar-text-label {
+    font-size: 14px !important;
+    text-shadow: 0 0 8px white, 0 1px 3px black;
+    z-index: 110;
+    max-width: none !important;
+}
+
+
+/* Premium Floating Tooltip */
+.custom-tooltip {
+    position: fixed;
+    padding: 12px 16px;
+    background: rgba(15, 23, 42, 0.9);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: white;
+    font-size: 13px;
+    pointer-events: none;
+    z-index: 10000;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+    display: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    max-width: 250px;
+    line-height: 1.5;
+}
+
+.tooltip-title {
+    font-weight: 800;
+    color: var(--accent-cyan);
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 4px;
+    font-size: 14px;
+}
+
+.tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.tooltip-label {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.tooltip-value {
+    font-weight: 600;
+}
+
+/* Precision Bar Labels */
+.bar-text-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    transform-origin: center center;
+    white-space: nowrap;
+    color: white;
+    font-weight: 700;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+    pointer-events: none;
+    z-index: 5;
+    text-align: center;
+    opacity: 0.9;
+}
+
+.bar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    position: relative;
+    overflow: visible !important; /* Allow label to show */
 }

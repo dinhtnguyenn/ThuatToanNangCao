@@ -10,32 +10,48 @@ class DataTable {
     this.displayData = [];
     this.currentPage = 1;
     this.pageSize = 20;
-    this.sortField = 'price';
+    this.sortField = 'id';
     this.sortOrder = 'asc';
     this.sortAlgorithm = 'selection';
     this.searchQuery = '';
     this.dataLimit = 100000;
     this.lastSortResult = null;
     this.isInitialized = false;
+    this.datasetId = 'ecommerce';
   }
 
-  async init() {
+  async init(preloadedData = null) {
+    if (preloadedData) {
+      this.allData = preloadedData;
+      this.filteredData = [...this.allData];
+      this.isInitialized = true;
+      this.render();
+      this.bindEvents();
+      this.updateStats();
+      return;
+    }
+
     try {
-      const response = await fetch('data.json');
-      this.allData = await response.json();
+      // Try to load from JSON if available, else generate default
+      const response = await fetch('data.json').catch(() => null);
+      if (response && response.ok) {
+        this.allData = await response.json();
+      } else {
+        this.allData = DatasetManager.getDataset('ecommerce').generate(this.dataLimit);
+      }
       this.filteredData = [...this.allData];
       this.isInitialized = true;
       this.render();
       this.bindEvents();
       this.updateStats();
     } catch (error) {
-      console.error('Failed to load data:', error);
-      this.container.innerHTML = `
-        <div class="empty-state">
-          <div class="icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
-          <p>Không thể tải dữ liệu. Vui lòng kiểm tra file data.json</p>
-        </div>
-      `;
+      console.warn('Could not load data.json, using generated data instead.');
+      this.allData = DatasetManager.getDataset('ecommerce').generate(this.dataLimit);
+      this.filteredData = [...this.allData];
+      this.isInitialized = true;
+      this.render();
+      this.bindEvents();
+      this.updateStats();
     }
   }
 
@@ -85,11 +101,7 @@ class DataTable {
         <div class="control-group">
           <label>Sắp xếp theo:</label>
           <select id="field-select">
-            <option value="price">Giá (Price)</option>
-            <option value="rating">Đánh giá (Rating)</option>
-            <option value="stock">Tồn kho (Stock)</option>
-            <option value="name">Tên (Name)</option>
-            <option value="id">ID</option>
+            ${DatasetManager.getDataset(this.datasetId).fields.map(f => `<option value="${f.id}" ${f.id === this.sortField ? 'selected' : ''}>${f.label}</option>`).join('')}
           </select>
         </div>
 
@@ -140,10 +152,9 @@ class DataTable {
           <thead>
             <tr>
               <th data-field="id" style="width: 60px">#</th>
-              <th data-field="name">Tên sản phẩm</th>
-              <th data-field="price">Giá (VNĐ)</th>
-              <th data-field="rating">Đánh giá</th>
-              <th data-field="stock">Tồn kho</th>
+              ${DatasetManager.getDataset(this.datasetId).fields.map(f => `
+                <th data-field="${f.id}">${f.label}</th>
+              `).join('')}
             </tr>
           </thead>
           <tbody id="table-body"></tbody>
@@ -177,26 +188,65 @@ class DataTable {
       return;
     }
 
+    const fields = DatasetManager.getDataset(this.datasetId).fields;
     tbody.innerHTML = this.displayData.map((item, idx) => `
       <tr data-id="${item.id}" data-index="${start + idx}">
         <td style="color: var(--text-muted); font-family: var(--font-mono); font-size: 0.8rem;">${item.id}</td>
-        <td>
-          <div style="font-weight: 500;">${this.escapeHtml(item.name)}</div>
-        </td>
-        <td class="price-cell">${Number(item.price).toLocaleString('vi-VN', { style: 'currency', currency: 'VND' })}</td>
-        <td>
-          <div class="rating-stars">
-            ${this.renderStars(item.rating)}
-            <span class="rating-value">${item.rating}</span>
-          </div>
-        </td>
-        <td>
-          <span class="stock-badge ${item.stock < 20 ? 'low' : item.stock < 100 ? 'medium' : 'high'}">
-            ${item.stock}
-          </span>
-        </td>
+        ${fields.map(f => `
+          <td>${this.formatValue(item[f.id], f.id)}</td>
+        `).join('')}
       </tr>
     `).join('');
+  }
+
+  formatValue(value, fieldId) {
+    if (this.datasetId === 'ecommerce') {
+      if (fieldId === 'price') return Number(value).toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+      if (fieldId === 'rating') return `
+        <div class="rating-stars">
+          ${this.renderStars(value)}
+          <span class="rating-value">${value}</span>
+        </div>
+      `;
+      if (fieldId === 'stock') return `
+        <span class="stock-badge ${value < 20 ? 'low' : value < 100 ? 'medium' : 'high'}">${value}</span>
+      `;
+    }
+    
+    if (this.datasetId === 'education') {
+      if (fieldId === 'gpa') return `<span style="font-weight: 600; color: ${value > 3.5 ? 'var(--accent-green-light)' : 'var(--text-primary)'}">${value.toFixed(2)}</span>`;
+      if (fieldId === 'score') return `<span class="stock-badge ${value < 50 ? 'low' : 'high'}">${value}</span>`;
+    }
+
+    if (this.datasetId === 'finance') {
+      if (fieldId === 'change') return `<span style="font-weight: 600; color: ${value > 0 ? 'var(--accent-green-light)' : 'var(--accent-red-light)'}">${value > 0 ? '+' : ''}${value}%</span>`;
+      if (fieldId === 'price' || fieldId === 'volume') return value.toLocaleString();
+    }
+
+    if (this.datasetId === 'geography') {
+      if (fieldId === 'population' || fieldId === 'area' || fieldId === 'density') return value.toLocaleString();
+    }
+
+    return this.escapeHtml(String(value));
+  }
+
+  formatStatValue(value, fieldId) {
+    const config = DatasetManager.getDataset(this.datasetId);
+    const field = config.fields.find(f => f.id === fieldId);
+    const unit = field?.unit || '';
+
+    // Smart number shortening
+    const formatShort = (num) => {
+      if (num >= 1000000000) return (num / 1000000000).toFixed(1) + ' Tỷ';
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + ' Tr';
+      return Math.round(num).toLocaleString('vi-VN');
+    };
+
+    if (fieldId === 'gpa') return value.toFixed(2);
+    if (fieldId === 'change') return (value > 0 ? '+' : '') + value.toFixed(2) + unit;
+    if (fieldId === 'rating') return value.toFixed(1) + ' ' + unit;
+    
+    return formatShort(value) + (unit ? ' ' + unit : '');
   }
 
   renderStars(rating) {
@@ -591,27 +641,68 @@ class DataTable {
   }
 
   updateStats() {
-    // Update hero stats
-    const totalProducts = document.getElementById('stat-total-products');
-    if (totalProducts) totalProducts.textContent = this.allData.length.toLocaleString('vi-VN');
-
-    const avgPrice = document.getElementById('stat-avg-price');
-    if (avgPrice) {
-      const avg = this.allData.reduce((sum, item) => sum + Number(item.price), 0) / this.allData.length;
-      avgPrice.textContent = avg.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
-      avgPrice.style.fontSize = '1.4rem'; // Ngăn chặn text quá dài làm lệch UI của card
+    const config = DatasetManager.getDataset(this.datasetId);
+    
+    // Card 1: Total
+    const totalItems = document.getElementById('stat-total-products');
+    const card1 = totalItems?.closest('.stat-card');
+    if (card1) {
+      const iconEl = card1.querySelector('.stat-icon i');
+      if (iconEl) iconEl.className = `fa-solid ${config.icon}`;
+      card1.querySelector('.stat-label').textContent = 'Tổng số mục';
+      totalItems.textContent = this.allData.length.toLocaleString('vi-VN');
     }
 
-    const avgRating = document.getElementById('stat-avg-rating');
-    if (avgRating) {
-      const avg = this.allData.reduce((sum, item) => sum + item.rating, 0) / this.allData.length;
-      avgRating.textContent = avg.toFixed(1);
+    const numericFields = config.fields.filter(f => f.type === 'number');
+
+    // Card 2: Average of field 1
+    const stat2Value = document.getElementById('stat-avg-price');
+    const card2 = stat2Value?.closest('.stat-card');
+    if (card2 && numericFields.length > 0) {
+      const field = numericFields[0];
+      const avg = this.allData.reduce((sum, item) => sum + Number(item[field.id]), 0) / this.allData.length;
+      const iconEl = card2.querySelector('.stat-icon i');
+      if (iconEl) iconEl.className = `fa-solid ${field.icon}`;
+      card2.querySelector('.stat-label').textContent = `TB ${field.label}`;
+      stat2Value.textContent = this.formatStatValue(avg, field.id);
     }
 
-    const totalStock = document.getElementById('stat-total-stock');
-    if (totalStock) {
-      const total = this.allData.reduce((sum, item) => sum + item.stock, 0);
-      totalStock.textContent = total.toLocaleString();
+    // Card 3: Average of field 2
+    const stat3Value = document.getElementById('stat-avg-rating');
+    const card3 = stat3Value?.closest('.stat-card');
+    if (card3 && numericFields.length > 1) {
+      const field = numericFields[1];
+      const avg = this.allData.reduce((sum, item) => sum + Number(item[field.id]), 0) / this.allData.length;
+      const iconEl = card3.querySelector('.stat-icon i');
+      if (iconEl) iconEl.className = `fa-solid ${field.icon}`;
+      card3.querySelector('.stat-label').textContent = `TB ${field.label}`;
+      stat3Value.textContent = this.formatStatValue(avg, field.id);
+
+      // Color coding for market change
+      if (field.id === 'change') {
+        stat3Value.style.color = avg > 0 ? 'var(--accent-green-light)' : avg < 0 ? 'var(--accent-red-light)' : 'inherit';
+      } else {
+        stat3Value.style.color = 'inherit';
+      }
+    }
+
+    // Card 4: Extra info
+    const stat4Value = document.getElementById('stat-total-stock');
+    const card4 = stat4Value?.closest('.stat-card');
+    if (card4) {
+      if (numericFields.length > 2) {
+        const field = numericFields[2];
+        const total = this.allData.reduce((sum, item) => sum + Number(item[field.id]), 0);
+        const iconEl = card4.querySelector('.stat-icon i');
+        if (iconEl) iconEl.className = `fa-solid ${field.icon}`;
+        card4.querySelector('.stat-label').textContent = `Tổng ${field.label}`;
+        stat4Value.textContent = this.formatStatValue(total, field.id);
+      } else {
+        const iconEl = card4.querySelector('.stat-icon i');
+        if (iconEl) iconEl.className = 'fa-solid fa-check-circle';
+        card4.querySelector('.stat-label').textContent = 'Trạng thái';
+        stat4Value.textContent = 'Sẵn sàng';
+      }
     }
   }
 
@@ -623,6 +714,18 @@ class DataTable {
     const d = document.createElement('div');
     d.textContent = text;
     return d.innerHTML;
+  }
+
+  updateDataset(datasetId, newData) {
+    this.datasetId = datasetId;
+    this.allData = newData;
+    this.filteredData = [...this.allData];
+    this.sortField = DatasetManager.getDataset(datasetId).fields[0].id;
+    this.currentPage = 1;
+    this.searchQuery = '';
+    this.render();
+    this.bindEvents();
+    this.updateStats();
   }
 }
 
