@@ -23,10 +23,9 @@ class Visualizer {
     this.dataType = 'random';
     this.result = null;
 
-    // Divide & Conquer tracking
-    this.activeRange = null;   // [left, right]
-    this.activeDepth = 0;
-    this.activeMidPoint = null;
+    // Advanced Insights
+    this.accessCount = [];     // for heatmap
+    this.comparativeCosts = {}; // { algo: stepCount }
   }
 
   init(allData) {
@@ -127,6 +126,9 @@ class Visualizer {
             <!-- Range indicator labels above chart -->
             <div class="range-labels" id="range-labels"></div>
             <div class="bar-chart show-values" id="bar-chart"></div>
+            <!-- Access Heatmap Strip -->
+            <div class="heatmap-container" id="vis-heatmap"></div>
+
             <!-- Comparison Detail Panel -->
             <div class="comparison-panel" id="comparison-panel">
               <div class="comparison-content">
@@ -253,11 +255,30 @@ class Visualizer {
           </div>
 
           <!-- Recursion Tree (only for merge/quick) -->
-          <div class="card" id="recursion-tree-card" style="display: none;">
-            <div class="card-header">
-              <div class="card-title"><i class="fa-solid fa-sitemap"></i> Đệ quy hiện tại</div>
-            </div>
             <div id="recursion-tree" style="font-size: 0.82rem; font-family: var(--font-mono); color: var(--text-secondary); line-height: 1.7;"></div>
+          </div>
+
+          <!-- SMART INSIGHT CARD -->
+          <div class="vis-insight-card" id="vis-insight-card">
+            <div class="insight-header">
+              <i class="fa-solid fa-lightbulb"></i> Tư vấn thông minh
+            </div>
+            <div class="insight-body" id="vis-insight-body">
+              Đang phân tích đặc điểm dữ liệu...
+            </div>
+          </div>
+
+          <!-- COST COMPARISON CARD -->
+          <div class="card cost-comparison-card">
+            <div class="card-header">
+              <div class="card-title"><i class="fa-solid fa-chart-simple"></i> So sánh chi phí dự kiến</div>
+            </div>
+            <div class="cost-chart" id="vis-cost-chart">
+              <!-- Bars injected here -->
+            </div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 10px; font-style: italic;">
+              * Tổng số bước dự tính dựa trên tập dữ liệu hiện tại
+            </div>
           </div>
         </div>
       </div>
@@ -425,6 +446,132 @@ class Visualizer {
     // Show/hide recursion tree card
     const treeCard = document.getElementById('recursion-tree-card');
     if (treeCard) treeCard.style.display = this.isDivideConquer ? 'block' : 'none';
+
+    // Advanced Analysis
+    this.accessCount = new Array(this.currentValues.length).fill(0);
+    this.renderHeatmap();
+    this.runDataAnalysis();
+    this.precalculateCosts();
+  }
+
+  // ======== HEATMAP RENDER ========
+  renderHeatmap() {
+    const container = document.getElementById('vis-heatmap');
+    if (!container) return;
+    
+    container.innerHTML = this.accessCount.map((count, i) => {
+      return `<div class="heatmap-cell" id="heatmap-${i}" style="background: rgba(34, 211, 238, 0.05);"></div>`;
+    }).join('');
+  }
+
+  updateHeatmapUI(indices) {
+    if (!indices) return;
+    indices.forEach(idx => {
+      if (idx >= 0 && idx < this.accessCount.length) {
+        this.accessCount[idx]++;
+        const cell = document.getElementById(`heatmap-${idx}`);
+        if (cell) {
+          const maxAccess = Math.max(...this.accessCount, 1);
+          const ratio = this.accessCount[idx] / maxAccess;
+          // Interpolate from Cyan (low) to Orange/Red (high)
+          const hue = 180 - (ratio * 180); // 180 (cyan) to 0 (red)
+          cell.style.background = `hsla(${hue}, 80%, 50%, ${0.2 + ratio * 0.8})`;
+        }
+      }
+    });
+  }
+
+  // ======== SMART INSIGHTS ========
+  runDataAnalysis() {
+    const vals = this.currentValues.map(v => Number(v));
+    const n = vals.length;
+    if (n < 2) return;
+
+    let sortedPairs = 0;
+    let reversedPairs = 0;
+    for (let i = 0; i < n - 1; i++) {
+      if (vals[i] <= vals[i+1]) sortedPairs++;
+      if (vals[i] >= vals[i+1]) reversedPairs++;
+    }
+
+    const sortPct = (sortedPairs / (n - 1)) * 100;
+    const reversePct = (reversedPairs / (n - 1)) * 100;
+    const uniqueVals = new Set(vals);
+    const uniqueRatio = uniqueVals.size / n;
+
+    let trait = "Ngẫu nhiên";
+    let recommendation = "";
+    let reason = "";
+
+    if (sortPct === 100) {
+      trait = "Đã sắp xếp 100%";
+      recommendation = "Bất kỳ thuật toán nào";
+      reason = "Dữ liệu đã ở trạng thái hoàn hảo, không cần xử lý thêm.";
+    } else if (sortPct > 80) {
+      trait = "Gần như đã sắp xếp";
+      recommendation = "Insertion Sort";
+      reason = "Thuật toán này cực kỳ tối ưu (O(n)) cho mảng đã gần đúng vị trí.";
+    } else if (reversePct > 80) {
+      trait = "Đang bị đảo ngược";
+      recommendation = "Quick Sort / Merge Sort";
+      reason = "Dữ liệu bị đảo ngược khiến các thuật toán O(n²) gặp khó khăn lớn.";
+    } else if (uniqueRatio < 0.3) {
+      trait = "Nhiều giá trị trùng lặp";
+      recommendation = "Quick Sort";
+      reason = "Việc phân hoạch sẽ hiệu quả hơn khi có ít nhóm giá trị khác nhau.";
+    } else {
+      trait = "Phân bổ ngẫu nhiên";
+      recommendation = "Merge Sort / Quick Sort";
+      reason = "Với dữ liệu hỗn loạn, các thuật toán chia để trị luôn giữ vững phong độ O(n log n).";
+    }
+
+    const body = document.getElementById('vis-insight-body');
+    if (body) {
+      body.innerHTML = `
+        <div style="margin-bottom: 5px;"><strong>Đặc điểm:</strong> <span style="color: var(--accent-cyan);">${trait}</span></div>
+        <div style="margin-bottom: 5px;"><strong>Đề xuất:</strong> <span style="color: var(--accent-green);">${recommendation}</span></div>
+        <div style="font-style: italic; color: var(--text-muted); font-size: 0.78rem;">${reason}</div>
+      `;
+    }
+  }
+
+  // ======== COST PRECALCULATION ========
+  precalculateCosts() {
+    const algos = SortingAlgorithms.getAllNames();
+    const costs = {};
+    
+    algos.forEach(name => {
+      const result = SortingAlgorithms.run(name, [...this.currentValues], this.sortOrder);
+      costs[name] = result.steps.length;
+    });
+
+    this.comparativeCosts = costs;
+    this.renderCostChart();
+  }
+
+  renderCostChart() {
+    const container = document.getElementById('vis-cost-chart');
+    if (!container) return;
+
+    const algos = Object.keys(this.comparativeCosts);
+    const maxSteps = Math.max(...Object.values(this.comparativeCosts), 1);
+
+    container.innerHTML = algos.map(name => {
+      const info = SortingAlgorithms.getInfo(name);
+      const steps = this.comparativeCosts[name];
+      const pct = (steps / maxSteps) * 100;
+      const isActive = name === this.algorithm;
+
+      return `
+        <div class="cost-row">
+          <div class="cost-label" style="${isActive ? 'color: var(--accent-yellow); font-weight: bold;' : ''}">${info.name}</div>
+          <div class="cost-bar-bg">
+            <div class="cost-bar-fill ${isActive ? 'active' : ''}" style="width: ${pct}%"></div>
+          </div>
+          <div class="cost-value">${steps.toLocaleString()}</div>
+        </div>
+      `;
+    }).join('');
   }
 
   renderBars(highlightIndices = {}) {
@@ -758,6 +905,11 @@ class Visualizer {
     this.updatePseudocode(step.line);
     this.updateDCContext(step);
     this.updateRecursionTree(step);
+
+    // Heatmap update
+    if (step.indices) {
+      this.updateHeatmapUI(step.indices);
+    }
   }
 
   applyStepSilent(stepIndex) {
