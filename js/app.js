@@ -114,10 +114,15 @@ class App {
   }
 
   showToast(message, type = 'info') {
-    const icons = { success: '✅', info: 'ℹ️', warning: '⚠️', error: '❌' };
+    const icons = {
+      success: '<i class="fa-solid fa-circle-check" style="color: var(--accent-green)"></i>',
+      info: '<i class="fa-solid fa-circle-info" style="color: var(--accent-cyan)"></i>',
+      warning: '<i class="fa-solid fa-triangle-exclamation" style="color: var(--accent-yellow)"></i>',
+      error: '<i class="fa-solid fa-circle-xmark" style="color: var(--accent-red)"></i>'
+    };
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    toast.innerHTML = `<span>${icons[type] || 'ℹ️'}</span> ${message}`;
+    toast.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span> <span class="toast-msg">${message}</span>`;
 
     this.toastContainer.appendChild(toast);
 
