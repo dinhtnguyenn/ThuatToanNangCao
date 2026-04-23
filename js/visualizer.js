@@ -218,6 +218,10 @@ class Visualizer {
               <div class="label" id="vis-memory-label">Bộ nhớ / Call Stack</div>
               <div class="value purple" id="vis-memory-val">0</div>
             </div>
+            <div class="vis-stat">
+              <div class="label">Thời gian thực thi</div>
+              <div class="value green" id="vis-time-val">0 ms</div>
+            </div>
           </div>
         </div>
 
@@ -940,6 +944,12 @@ class Visualizer {
         memVal.textContent = `O(1) - Rỗng`;
       }
     }
+
+    // Update execution time
+    const timeVal = document.getElementById('vis-time-val');
+    if (timeVal && this.result) {
+      timeVal.textContent = `${this.result.timeMs.toFixed(2)} ms`;
+    }
   }
 
   updateAlgoInfo() {
@@ -948,7 +958,14 @@ class Visualizer {
 
     const el = (id) => document.getElementById(id);
     if (el('vis-algo-name')) el('vis-algo-name').textContent = info.name;
-    if (el('vis-algo-desc')) el('vis-algo-desc').textContent = info.description;
+    
+    // Build description + features
+    let descHtml = info.description;
+    if (info.features) {
+      descHtml += `<br><span style="color: var(--accent-cyan); display: inline-block; margin-top: 5px;"><i class="fa-solid fa-star"></i> <strong>Đặc điểm:</strong> ${info.features}</span>`;
+    }
+    if (el('vis-algo-desc')) el('vis-algo-desc').innerHTML = descHtml;
+    
     if (el('vis-algo-best')) el('vis-algo-best').textContent = info.best;
     if (el('vis-algo-avg')) el('vis-algo-avg').textContent = info.average;
     if (el('vis-algo-worst')) el('vis-algo-worst').textContent = info.worst;

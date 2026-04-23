@@ -7,16 +7,16 @@ class Race {
     this.container = document.getElementById(containerId);
     this.allData = [];
     this.originalValues = [];
-    
+
     this.isPlaying = false;
     this.playTimer = null;
     this.speed = 5; // 1-10
-    
+
     this.sampleSize = 30;
     this.sortField = 'price';
     this.sortOrder = 'asc';
     this.dataType = 'random';
-    
+
     this.algorithms = ['selection', 'insertion', 'bubble', 'merge', 'quick'];
     this.runners = []; // Stores state for each algorithm
     this.ranks = [];
@@ -83,8 +83,36 @@ class Race {
       </div>
 
       <!-- Race Grid -->
-      <div class="race-grid" id="race-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-lg);">
+      <div class="race-grid" id="race-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-lg); margin-bottom: var(--space-xl);">
         <!-- Injected via JS -->
+      </div>
+
+      <!-- Race Leaderboard -->
+      <div class="card" style="margin-top: var(--space-xl);">
+        <div class="card-header">
+          <div class="card-title"><i class="fa-solid fa-list-ol"></i> Bảng Thống Kê Trực Tiếp</div>
+        </div>
+        <div class="table-container">
+          <table class="data-table" id="race-leaderboard-table">
+            <thead>
+              <tr>
+                <th>Hạng</th>
+                <th>Thuật toán</th>
+                <th>Trạng thái</th>
+                <th>Tốc độ mô phỏng (giây)</th>
+                <th>Thực gian thực tế (ms)</th>
+                <th>So sánh</th>
+                <th>Hoán đổi</th>
+                <th>Độ phức tạp</th>
+                <th>Không gian</th>
+                <th>Ổn định</th>
+              </tr>
+            </thead>
+            <tbody id="race-leaderboard-body">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
       </div>
     `;
   }
@@ -122,7 +150,7 @@ class Race {
   generateSample() {
     this.pause();
     this.ranks = [];
-    
+
     // Generate base array
     const shuffled = [...this.allData].sort(() => Math.random() - 0.5);
     const sample = shuffled.slice(0, this.sampleSize);
@@ -154,12 +182,17 @@ class Race {
       const info = SortingAlgorithms.getInfo(algo);
       // Run the algorithm to precompute steps
       const result = SortingAlgorithms.run(algo, [...this.originalValues], this.sortOrder);
-      
+
       return {
         id: algo,
         name: info.name,
+        info: info, // store info for leaderboard
         values: [...this.originalValues],
         steps: result.steps,
+        comparisons: 0,
+        swaps: 0,
+        visualTimeMs: 0,
+        internalTimeMs: result.timeMs, // Actual JS time
         currentStep: -1,
         isDone: false,
         rank: null
@@ -167,7 +200,8 @@ class Race {
     });
 
     this.renderGrids();
-    
+    this.renderLeaderboard();
+
     const playBtn = document.getElementById('race-play-btn');
     if (playBtn) {
       playBtn.innerHTML = '<i class="fa-solid fa-play"></i> BẮT ĐẦU ĐUA';
@@ -179,11 +213,18 @@ class Race {
     const grid = document.getElementById('race-grid');
     if (!grid) return;
 
-    grid.innerHTML = this.runners.map(runner => `
-      <div class="card race-card" id="race-card-${runner.id}" style="position: relative; overflow: hidden;">
+    grid.innerHTML = this.runners.map(runner => {
+      const algoColors = {
+        'selection': '#f472b6', 'insertion': '#a78bfa',
+        'bubble': '#fb923c', 'merge': '#22d3ee', 'quick': '#34d399'
+      };
+      const badgeColor = algoColors[runner.id] || 'var(--accent-cyan)';
+
+      return `
+      <div class="card race-card" id="race-card-${runner.id}" style="position: relative; overflow: hidden; border-top: 4px solid ${badgeColor};">
         <div class="card-header" style="padding-bottom: 0;">
-          <div class="card-title">${runner.name}</div>
-          <span class="algo-badge" id="race-progress-${runner.id}">0%</span>
+          <div class="card-title" style="color: ${badgeColor}; text-shadow: 0 0 10px ${badgeColor}40;">${runner.name}</div>
+          <span class="algo-badge" id="race-progress-${runner.id}" style="background: ${badgeColor}20; color: ${badgeColor}; border-color: ${badgeColor}40;">0%</span>
         </div>
         <div class="race-chart-container" style="height: 180px; padding: 10px; display: flex; align-items: flex-end; gap: 1px;">
           <!-- Bars injected here -->
@@ -193,7 +234,8 @@ class Race {
           <h2 style="margin:0;">Hạng 1</h2>
         </div>
       </div>
-    `).join('');
+      `;
+    }).join('');
 
     this.runners.forEach(runner => {
       this.renderBars(runner);
@@ -205,14 +247,34 @@ class Race {
     const card = document.getElementById(`race-card-${runner.id}`);
     if (!card) return;
     const container = card.querySelector('.race-chart-container');
-    
+
     const maxVal = Math.max(...this.originalValues, 1);
     const n = runner.values.length;
     container.style.gap = n > 100 ? '0px' : '1px';
 
-    container.innerHTML = runner.values.map(val => {
+    const algoColors = {
+      'selection': '#f472b6', // pink
+      'insertion': '#a78bfa', // purple
+      'bubble': '#fb923c',    // orange
+      'merge': '#22d3ee',     // cyan
+      'quick': '#34d399'      // green
+    };
+
+    const baseColor = algoColors[runner.id] || 'var(--accent-cyan)';
+
+    container.innerHTML = runner.values.map((val, i) => {
       const height = Math.max((val / maxVal) * 100, 2);
-      return `<div style="flex: 1; height: ${height}%; background: var(--accent-cyan); border-radius: 2px 2px 0 0;"></div>`;
+      let bgColor = baseColor;
+
+      if (runner.isDone) {
+        bgColor = '#10b981'; // Green when done
+      } else if (runner.highlights?.comparing?.includes(i)) {
+        bgColor = '#fbbf24'; // Yellow
+      } else if (runner.highlights?.swapping?.includes(i)) {
+        bgColor = '#ef4444'; // Red
+      }
+
+      return `<div style="flex: 1; height: ${height}%; background: ${bgColor}; border-radius: 2px 2px 0 0; transition: background-color 0.1s;"></div>`;
     }).join('');
 
     // Update progress
@@ -227,17 +289,89 @@ class Race {
     }
   }
 
+  renderLeaderboard() {
+    const tbody = document.getElementById('race-leaderboard-body');
+    if (!tbody) return;
+
+    const algoColors = {
+      'selection': '#f472b6', 'insertion': '#a78bfa',
+      'bubble': '#fb923c', 'merge': '#22d3ee', 'quick': '#34d399'
+    };
+
+    // Sort by rank if finished, else keep original order or sort by progress
+    const sortedRunners = [...this.runners].sort((a, b) => {
+      if (a.rank !== null && b.rank !== null) return a.rank - b.rank;
+      if (a.rank !== null) return -1;
+      if (b.rank !== null) return 1;
+      return 0; // maintain order
+    });
+
+    tbody.innerHTML = sortedRunners.map(runner => {
+      const c = algoColors[runner.id] || 'var(--text-color)';
+      const statusHtml = runner.isDone
+        ? `<span class="badge" style="background: ${c}20; color: ${c}"><i class="fa-solid fa-check"></i> Hoàn thành</span>`
+        : `<span class="badge" style="background: var(--bg-hover); color: var(--text-muted)"><i class="fa-solid fa-spinner fa-spin"></i> Đang chạy</span>`;
+
+      const rankHtml = runner.rank
+        ? `<strong style="color: ${runner.rank === 1 ? 'var(--accent-yellow)' : c}">#${runner.rank}</strong>`
+        : '-';
+
+      // Only show time if done, else show current accumulated
+      const timeHtml = runner.isDone
+        ? `${(runner.visualTimeMs / 1000).toFixed(2)}s`
+        : runner.visualTimeMs > 0 ? `${(runner.visualTimeMs / 1000).toFixed(1)}s` : '-';
+
+      return `
+        <tr style="border-left: 3px solid ${c}">
+          <td style="text-align: center;">${rankHtml}</td>
+          <td>
+            <strong style="color: ${c}">${runner.name}</strong>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; max-width: 250px;">
+              ${runner.info.features || runner.info.description}
+            </div>
+          </td>
+          <td>${statusHtml}</td>
+          <td style="text-align: right; font-family: monospace;" id="lb-time-${runner.id}">${timeHtml}</td>
+          <td style="text-align: right; font-family: monospace; color: var(--accent-cyan);">${runner.internalTimeMs.toFixed(3)}ms</td>
+          <td style="text-align: right; font-family: monospace;" id="lb-cmp-${runner.id}">${runner.comparisons.toLocaleString()}</td>
+          <td style="text-align: right; font-family: monospace;" id="lb-swap-${runner.id}">${runner.swaps.toLocaleString()}</td>
+          <td><span class="complexity-badge">${runner.info.worst}</span></td>
+          <td><span class="complexity-badge">${runner.info.space}</span></td>
+          <td>${runner.info.stable ? '<span class="text-success">Có</span>' : '<span class="text-error">Không</span>'}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  updateLeaderboardRow(runner) {
+    const cmpEl = document.getElementById(`lb-cmp-${runner.id}`);
+    const swapEl = document.getElementById(`lb-swap-${runner.id}`);
+    const timeEl = document.getElementById(`lb-time-${runner.id}`);
+
+    if (cmpEl) cmpEl.textContent = runner.comparisons.toLocaleString();
+    if (swapEl) swapEl.textContent = runner.swaps.toLocaleString();
+    if (timeEl) {
+      timeEl.textContent = runner.isDone
+        ? `${(runner.visualTimeMs / 1000).toFixed(2)}s`
+        : `${(runner.visualTimeMs / 1000).toFixed(1)}s`;
+    }
+  }
+
   resetRace() {
     this.pause();
     this.ranks = [];
     this.runners.forEach(runner => {
       runner.values = [...this.originalValues];
       runner.currentStep = -1;
+      runner.comparisons = 0;
+      runner.swaps = 0;
+      runner.visualTimeMs = 0;
       runner.isDone = false;
       runner.rank = null;
     });
     this.renderGrids();
-    
+    this.renderLeaderboard();
+
     const playBtn = document.getElementById('race-play-btn');
     if (playBtn) {
       playBtn.innerHTML = '<i class="fa-solid fa-play"></i> BẮT ĐẦU ĐUA';
@@ -269,13 +403,17 @@ class Race {
       1: 500, 2: 300, 3: 150, 4: 80, 5: 40,
       6: 20, 7: 10, 8: 5, 9: 2, 10: 1
     };
-    
+
     const stepLoop = () => {
       let anyMoved = false;
+      const currentDelay = delays[this.speed] || 40;
 
       this.runners.forEach(runner => {
         if (runner.isDone) return;
-        
+
+        // Accumulate visual time
+        runner.visualTimeMs += currentDelay;
+
         // Apply 1 step
         runner.currentStep++;
         if (runner.currentStep >= runner.steps.length) {
@@ -283,6 +421,7 @@ class Race {
           this.ranks.push(runner.id);
           runner.rank = this.ranks.length;
           this.showRank(runner);
+          this.renderLeaderboard(); // full re-render to show ranks and final time
           return;
         }
 
@@ -290,6 +429,7 @@ class Race {
         const step = runner.steps[runner.currentStep];
         this.applyStep(runner, step);
         this.renderBars(runner);
+        this.updateLeaderboardRow(runner); // fast update
       });
 
       if (!anyMoved) {
@@ -310,7 +450,7 @@ class Race {
   pause() {
     this.isPlaying = false;
     if (this.playTimer) clearTimeout(this.playTimer);
-    
+
     const playBtn = document.getElementById('race-play-btn');
     if (playBtn && !this.runners.every(r => r.isDone)) {
       playBtn.innerHTML = '<i class="fa-solid fa-play"></i> TIẾP TỤC';
@@ -319,29 +459,37 @@ class Race {
   }
 
   applyStep(runner, step) {
-    if (step.type === 'swap') {
+    runner.highlights = { comparing: [], swapping: [] };
+
+    if (step.type === 'compare' || step.type === 'info') {
+      runner.highlights.comparing = step.indices || [];
+      if (step.type === 'compare') runner.comparisons++;
+    } else if (step.type === 'swap') {
+      runner.highlights.swapping = step.indices || [];
+      runner.swaps++;
       const [i, j] = step.indices;
       [runner.values[i], runner.values[j]] = [runner.values[j], runner.values[i]];
     } else if (step.type === 'insert') {
-      // In algorithms.js, 'insert' might just be a notification. 
-      // The actual array mutation is usually done inside the visualization if we track it.
-      // Wait, algorithms.js steps don't mutate for insertion, they just show the state. 
-      // Actually, my algorithms.js steps push \`values\` array in \`merge\` steps!
+      runner.highlights.swapping = step.indices || [];
+      runner.swaps++;
       if (step.values) {
         runner.values = [...step.values];
       }
-    } else if (step.type === 'merge') {
+    } else if (step.type === 'merge' || step.type === 'merge-done') {
+      runner.highlights.swapping = step.indices || [];
+      if (step.type === 'merge') runner.swaps++;
       if (step.values) {
         runner.values = [...step.values];
       }
+    } else if (step.type === 'pivot' || step.type === 'partition-done' || step.type === 'base-case') {
+      runner.highlights.swapping = step.indices || [];
     }
-    // We only need basic swapping and overriding for Race visualizer
   }
 
   showRank(runner) {
     const overlay = document.getElementById(`race-rank-${runner.id}`);
     if (!overlay) return;
-    
+
     let color = 'white';
     let icon = 'fa-medal';
     if (runner.rank === 1) { color = 'var(--accent-yellow)'; icon = 'fa-trophy'; }
