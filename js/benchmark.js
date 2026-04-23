@@ -32,6 +32,9 @@ class Benchmark {
             <option value="200" selected>200 phần tử</option>
             <option value="500">500 phần tử</option>
             <option value="1000">1000 phần tử</option>
+            <option value="10000">10.000 phần tử</option>
+            <option value="50000">50.000 phần tử</option>
+            <option value="100000">100.000 phần tử</option>
           </select>
         </div>
 
@@ -55,15 +58,15 @@ class Benchmark {
         <div class="control-group">
           <label>Dữ liệu:</label>
           <div class="data-type-group">
-            <button class="data-type-btn active" data-type="random">🎲 Random</button>
-            <button class="data-type-btn" data-type="nearly">📊 Gần sắp xếp</button>
-            <button class="data-type-btn" data-type="reversed">🔄 Đảo ngược</button>
-            <button class="data-type-btn" data-type="few">🎯 Ít giá trị</button>
+            <button class="data-type-btn active" data-type="random"><i class="fa-solid fa-shuffle"></i> Random</button>
+            <button class="data-type-btn" data-type="nearly"><i class="fa-solid fa-chart-line"></i> Gần sắp xếp</button>
+            <button class="data-type-btn" data-type="reversed"><i class="fa-solid fa-rotate"></i> Đảo ngược</button>
+            <button class="data-type-btn" data-type="few"><i class="fa-solid fa-crosshairs"></i> Ít giá trị</button>
           </div>
         </div>
 
         <button class="btn btn-primary btn-lg" id="bench-run-btn">
-          <span>🚀</span> Chạy Benchmark
+          <span><i class="fa-solid fa-rocket"></i></span> Chạy Benchmark
         </button>
       </div>
 
@@ -82,7 +85,7 @@ class Benchmark {
           <!-- Table -->
           <div class="card">
             <div class="card-header">
-              <div class="card-title">📊 Bảng kết quả</div>
+              <div class="card-title"><i class="fa-solid fa-table-list"></i> Bảng kết quả</div>
               <span class="algo-badge" id="bench-data-info">-</span>
             </div>
             <div class="benchmark-table-container">
@@ -104,7 +107,7 @@ class Benchmark {
           <!-- Chart -->
           <div class="card">
             <div class="card-header">
-              <div class="card-title">📈 Biểu đồ so sánh thời gian</div>
+              <div class="card-title"><i class="fa-solid fa-chart-column"></i> Biểu đồ so sánh thời gian</div>
             </div>
             <div class="benchmark-chart" id="bench-chart"></div>
           </div>
@@ -114,7 +117,7 @@ class Benchmark {
         <div style="margin-top: var(--space-lg);">
           <div class="card">
             <div class="card-header">
-              <div class="card-title">🔬 So sánh chi tiết</div>
+              <div class="card-title"><i class="fa-solid fa-microscope"></i> So sánh chi tiết</div>
             </div>
             <div class="benchmark-results" style="margin-top: 0;">
               <div>
@@ -132,7 +135,7 @@ class Benchmark {
         <!-- Summary Card -->
         <div class="card" style="margin-top: var(--space-lg);">
           <div class="card-header">
-            <div class="card-title">💡 Nhận xét</div>
+            <div class="card-title"><i class="fa-solid fa-lightbulb"></i> Nhận xét</div>
           </div>
           <div id="bench-summary" style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.8;"></div>
         </div>
@@ -209,7 +212,7 @@ class Benchmark {
     const runBtn = document.getElementById('bench-run-btn');
     if (runBtn) {
       runBtn.disabled = true;
-      runBtn.innerHTML = '<span>⏳</span> Đang chạy...';
+      runBtn.innerHTML = '<span><i class="fa-solid fa-spinner fa-spin"></i></span> Đang chạy...';
     }
 
     const progress = document.getElementById('bench-progress');
@@ -238,23 +241,38 @@ class Benchmark {
       let totalTime = 0;
       let totalComparisons = 0;
       let totalSwaps = 0;
+      let skipped = false;
 
-      for (let run = 0; run < numRuns; run++) {
-        const result = SortingAlgorithms.benchmark(algoName, [...data], this.sortOrder);
-        totalTime += result.timeMs;
-        totalComparisons += result.comparisons;
-        totalSwaps += result.swaps;
+      // Bảo vệ trình duyệt: Không chạy O(N^2) nếu dữ liệu quá lớn
+      if (this.sampleSize >= 10000 && (algoName === 'selection' || algoName === 'insertion' || algoName === 'bubble')) {
+        skipped = true;
+      } else {
+        // Giảm số lần chạy (numRuns) nếu dữ liệu lớn để tránh chờ quá lâu
+        const currentRuns = this.sampleSize >= 10000 ? 1 : numRuns;
+        for (let run = 0; run < currentRuns; run++) {
+          const result = SortingAlgorithms.benchmark(algoName, [...data], this.sortOrder);
+          totalTime += result.timeMs;
+          totalComparisons += result.comparisons;
+          totalSwaps += result.swaps;
+        }
+        
+        // Trung bình cộng nếu có chạy nhiều lần
+        if (currentRuns > 1) {
+          totalTime /= currentRuns;
+          totalComparisons /= currentRuns;
+          totalSwaps /= currentRuns;
+        }
       }
 
       this.results.push({
         algorithm: algoName,
         name: info.name,
-        timeMs: totalTime / numRuns,
-        comparisons: Math.round(totalComparisons / numRuns),
-        swaps: Math.round(totalSwaps / numRuns),
-        best: info.best,
+        timeMs: skipped ? Infinity : totalTime,
+        comparisons: skipped ? Infinity : totalComparisons,
+        swaps: skipped ? Infinity : totalSwaps,
         average: info.average,
-        worst: info.worst
+        space: info.space,
+        skipped: skipped
       });
 
       if (progressBar) progressBar.style.width = `${((algoIdx + 1) / algorithms.length) * 100}%`;
@@ -275,7 +293,7 @@ class Benchmark {
 
     if (runBtn) {
       runBtn.disabled = false;
-      runBtn.innerHTML = '<span>🚀</span> Chạy Benchmark';
+      runBtn.innerHTML = '<span><i class="fa-solid fa-rocket"></i></span> Chạy Benchmark';
     }
 
     this.isRunning = false;
@@ -294,7 +312,7 @@ class Benchmark {
     const dataInfo = document.getElementById('bench-data-info');
     const dataTypeNames = { random: 'Random', nearly: 'Gần sắp xếp', reversed: 'Đảo ngược', few: 'Ít giá trị' };
     if (dataInfo) {
-      dataInfo.textContent = `${this.sampleSize} items | ${dataTypeNames[this.dataType]} | ${this.sortField}`;
+      dataInfo.textContent = `${this.sampleSize.toLocaleString()} items | ${dataTypeNames[this.dataType]} | ${this.sortField}`;
     }
   }
 
@@ -303,25 +321,39 @@ class Benchmark {
     if (!tbody) return;
 
     tbody.innerHTML = this.results.map((r, i) => {
+      const isFastest = !r.skipped && this.results.length > 1 && r.timeMs === Math.min(...this.results.filter(res => !res.skipped).map(res => res.timeMs));
+      const rowCls = isFastest ? 'fastest' : (r.skipped ? 'skipped' : '');
       const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'other';
-      const rowClass = i === 0 ? 'fastest' : i === this.results.length - 1 ? 'slowest' : '';
-
-      return `
-        <tr class="${rowClass}">
-          <td><span class="rank-badge ${rankClass}">${r.rank}</span></td>
-          <td>
-            <div style="font-weight: 600;">${r.name}</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">
-              ${r.average}
-            </div>
+      
+      let metricsHtml = '';
+      if (r.skipped) {
+        metricsHtml = `
+          <td colspan="3" style="text-align: center; color: var(--text-muted); font-style: italic;">
+            <i class="fa-solid fa-triangle-exclamation"></i> Bỏ qua (O(N²) quá chậm)
           </td>
+        `;
+      } else {
+        metricsHtml = `
           <td>
-            <span style="font-weight: 700; font-family: var(--font-mono); color: ${i === 0 ? 'var(--accent-green-light)' : i === this.results.length - 1 ? 'var(--accent-red-light)' : 'var(--text-primary)'}">
+            <span style="font-weight: 700; font-family: var(--font-mono); color: ${isFastest ? 'var(--accent-green-light)' : 'var(--text-primary)'}">
               ${r.timeMs.toFixed(3)} ms
             </span>
           </td>
           <td style="font-family: var(--font-mono); font-size: 0.85rem;">${r.comparisons.toLocaleString()}</td>
           <td style="font-family: var(--font-mono); font-size: 0.85rem;">${r.swaps.toLocaleString()}</td>
+        `;
+      }
+
+      return `
+        <tr class="${rowCls}">
+          <td><span class="rank-badge ${rankClass}">${r.rank}</span></td>
+          <td>
+            <div style="font-weight: 600;">${r.name}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">
+              ${r.average} | ${r.space}
+            </div>
+          </td>
+          ${metricsHtml}
         </tr>
       `;
     }).join('');
@@ -331,9 +363,12 @@ class Benchmark {
     const chart = document.getElementById('bench-chart');
     if (!chart) return;
 
-    const maxTime = Math.max(...this.results.map(r => r.timeMs), 0.001);
+    const validResults = this.results.filter(r => !r.skipped);
+    if (validResults.length === 0) return;
 
-    chart.innerHTML = this.results.map((r, i) => {
+    const maxTime = Math.max(...validResults.map(r => r.timeMs), 0.001);
+
+    chart.innerHTML = validResults.map((r, i) => {
       const width = Math.max((r.timeMs / maxTime) * 100, 5);
       return `
         <div class="benchmark-bar-row">
@@ -359,11 +394,12 @@ class Benchmark {
     // Comparisons chart
     const compChart = document.getElementById('bench-chart-comparisons');
     if (compChart) {
-      const maxComp = Math.max(...this.results.map(r => r.comparisons), 1);
-      const sorted = [...this.results].sort((a, b) => a.comparisons - b.comparisons);
+      const valid = this.results.filter(r => !r.skipped);
+      const maxComp = Math.max(...valid.map(r => r.comparisons), 1);
+      const sorted = [...valid].sort((a, b) => a.comparisons - b.comparisons);
 
-      compChart.innerHTML = sorted.map((r, i) => {
-        const origIdx = this.results.indexOf(r);
+      compChart.innerHTML = sorted.map((r) => {
+        const origIdx = this.results.findIndex(x => x.algorithm === r.algorithm);
         const width = Math.max((r.comparisons / maxComp) * 100, 5);
         return `
           <div class="benchmark-bar-row">
@@ -381,11 +417,12 @@ class Benchmark {
     // Swaps chart
     const swapChart = document.getElementById('bench-chart-swaps');
     if (swapChart) {
-      const maxSwap = Math.max(...this.results.map(r => r.swaps), 1);
-      const sorted = [...this.results].sort((a, b) => a.swaps - b.swaps);
+      const valid = this.results.filter(r => !r.skipped);
+      const maxSwap = Math.max(...valid.map(r => r.swaps), 1);
+      const sorted = [...valid].sort((a, b) => a.swaps - b.swaps);
 
-      swapChart.innerHTML = sorted.map((r, i) => {
-        const origIdx = this.results.indexOf(r);
+      swapChart.innerHTML = sorted.map((r) => {
+        const origIdx = this.results.findIndex(x => x.algorithm === r.algorithm);
         const width = Math.max((r.swaps / maxSwap) * 100, 5);
         return `
           <div class="benchmark-bar-row">
@@ -405,23 +442,31 @@ class Benchmark {
     const summary = document.getElementById('bench-summary');
     if (!summary) return;
 
-    const fastest = this.results[0];
-    const slowest = this.results[this.results.length - 1];
+    const validResults = this.results.filter(r => !r.skipped);
+    if (validResults.length === 0) {
+      summary.innerHTML = '<p><i class="fa-solid fa-triangle-exclamation" style="color: var(--accent-yellow)"></i> Tất cả các thuật toán O(N²) đã bị bỏ qua do dữ liệu quá lớn.</p>';
+      return;
+    }
+
+    const fastest = validResults.reduce((a, b) => a.timeMs < b.timeMs ? a : b);
+    const slowest = validResults.reduce((a, b) => a.timeMs > b.timeMs ? a : b);
     const speedup = slowest.timeMs / Math.max(fastest.timeMs, 0.001);
 
     const dataTypeNames = { random: 'ngẫu nhiên', nearly: 'gần sắp xếp', reversed: 'đảo ngược', few: 'ít giá trị duy nhất' };
 
     summary.innerHTML = `
-      <p>🏆 <strong style="color: var(--accent-green-light);">${fastest.name}</strong> nhanh nhất với thời gian trung bình <strong>${fastest.timeMs.toFixed(3)}ms</strong>, nhanh hơn <strong style="color: var(--accent-red-light);">${slowest.name}</strong> khoảng <strong>${speedup.toFixed(1)}x</strong>.</p>
-      <p style="margin-top: 0.5rem;">📊 Trên tập dữ liệu <strong>${this.sampleSize} phần tử</strong> ${dataTypeNames[this.dataType]}, sắp xếp theo <strong>${this.sortField}</strong>:</p>
+      <p><i class="fa-solid fa-trophy" style="color: var(--accent-yellow)"></i> <strong style="color: var(--accent-green-light);">${fastest.name}</strong> nhanh nhất với thời gian trung bình <strong>${fastest.timeMs.toFixed(3)}ms</strong>, nhanh hơn <strong style="color: var(--accent-red-light);">${slowest.name}</strong> khoảng <strong>${speedup.toFixed(1)}x</strong>.</p>
+      <p style="margin-top: 0.5rem;"><i class="fa-solid fa-chart-pie"></i> Trên tập dữ liệu <strong>${this.sampleSize.toLocaleString()} phần tử</strong> ${dataTypeNames[this.dataType]}, sắp xếp theo <strong>${this.sortField}</strong>:</p>
       <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
         ${this.results.map(r => 
-          `<li><strong>${r.name}</strong> (${r.average}): ${r.timeMs.toFixed(3)}ms, ${r.comparisons.toLocaleString()} so sánh, ${r.swaps.toLocaleString()} hoán đổi</li>`
+          r.skipped 
+            ? `<li><strong style="color: var(--text-muted);">${r.name}</strong>: <em>Bỏ qua (quá chậm)</em></li>`
+            : `<li><strong>${r.name}</strong> (${r.average}): ${r.timeMs.toFixed(3)}ms, ${r.comparisons.toLocaleString()} so sánh, ${r.swaps.toLocaleString()} hoán đổi</li>`
         ).join('')}
       </ul>
-      <p style="margin-top: 0.5rem;">💡 <strong>Ghi chú:</strong> Mỗi thuật toán được chạy 5 lần và lấy giá trị trung bình. Thời gian thực tế có thể thay đổi tùy theo trạng thái hệ thống.</p>
-      ${this.dataType === 'nearly' ? '<p style="margin-top: 0.5rem;">📌 Với dữ liệu gần sắp xếp, <strong>Insertion Sort</strong> thường hoạt động rất hiệu quả do đặc tính O(n) trong best case.</p>' : ''}
-      ${this.dataType === 'reversed' ? '<p style="margin-top: 0.5rem;">📌 Với dữ liệu đảo ngược, <strong>Bubble Sort</strong> và <strong>Insertion Sort</strong> thường hoạt động kém nhất do phải thực hiện nhiều hoán đổi.</p>' : ''}
+      <p style="margin-top: 0.5rem;"><i class="fa-solid fa-circle-info"></i> <strong>Ghi chú:</strong> Mỗi thuật toán được chạy 5 lần và lấy giá trị trung bình. Thời gian thực tế có thể thay đổi tùy theo trạng thái hệ thống.</p>
+      ${this.dataType === 'nearly' ? '<p style="margin-top: 0.5rem;"><i class="fa-solid fa-thumbtack"></i> Với dữ liệu gần sắp xếp, <strong>Insertion Sort</strong> thường hoạt động rất hiệu quả do đặc tính O(n) trong best case.</p>' : ''}
+      ${this.dataType === 'reversed' ? '<p style="margin-top: 0.5rem;"><i class="fa-solid fa-thumbtack"></i> Với dữ liệu đảo ngược, <strong>Bubble Sort</strong> và <strong>Insertion Sort</strong> thường hoạt động kém nhất do phải thực hiện nhiều hoán đổi.</p>' : ''}
     `;
   }
 }

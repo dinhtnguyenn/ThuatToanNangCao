@@ -31,26 +31,71 @@ class SortingAlgorithms {
       steps.push({
         type: 'info',
         indices: [i],
+        loopContext: {
+          algorithm: 'selection',
+          outerIndex: i,
+          innerIndex: null,
+          minIdx: i,
+          minValue: a[i],
+          scanRange: [i, n - 1],
+          sortedCount: i,
+          phase: 'start-scan'
+        },
         description: `Bắt đầu tìm phần tử ${order === 'asc' ? 'nhỏ nhất' : 'lớn nhất'} từ vị trí ${i}`,
         line: 0
       });
 
       for (let j = i + 1; j < n; j++) {
         comparisons++;
+        const cond = order === 'asc' ? a[j] < a[minIdx] : a[j] > a[minIdx];
+        const cmpResult = a[j] > a[minIdx] ? 'greater' : (a[j] < a[minIdx] ? 'less' : 'equal');
         steps.push({
           type: 'compare',
           indices: [minIdx, j],
-          description: `So sánh a[${minIdx}]=${a[minIdx]} với a[${j}]=${a[j]}`,
+          comparedValues: [a[minIdx], a[j]],
+          comparisonResult: cmpResult,
+          willSwap: cond,
+          comparisonDetail: {
+            leftLabel: `a[${minIdx}]`,
+            rightLabel: `a[${j}]`,
+            leftValue: a[minIdx],
+            rightValue: a[j],
+            operator: cmpResult === 'greater' ? '>' : (cmpResult === 'less' ? '<' : '='),
+            action: cond
+              ? `${a[j]} ${order === 'asc' ? '<' : '>'} ${a[minIdx]} → Cập nhật ${order === 'asc' ? 'min' : 'max'}!`
+              : `${a[j]} ${order === 'asc' ? '≥' : '≤'} ${a[minIdx]} → Giữ nguyên ✓`
+          },
+          loopContext: {
+            algorithm: 'selection',
+            outerIndex: i,
+            innerIndex: j,
+            minIdx: minIdx,
+            minValue: a[minIdx],
+            scanRange: [i, n - 1],
+            sortedCount: i,
+            phase: 'comparing'
+          },
+          description: `So sánh a[${minIdx}]=${a[minIdx]} với a[${j}]=${a[j]} → ${cond ? 'Cập nhật ' + (order === 'asc' ? 'min' : 'max') + '!' : 'Giữ nguyên ✓'}`,
           line: 2
         });
 
-        const cond = order === 'asc' ? a[j] < a[minIdx] : a[j] > a[minIdx];
         if (cond) {
           minIdx = j;
           steps.push({
-            type: 'info',
+            type: 'min-update',
             indices: [minIdx],
-            description: `Cập nhật: phần tử ${order === 'asc' ? 'min' : 'max'} mới tại vị trí ${minIdx} (giá trị ${a[minIdx]})`,
+            oldMinIdx: minIdx === j ? i : -1,
+            loopContext: {
+              algorithm: 'selection',
+              outerIndex: i,
+              innerIndex: j,
+              minIdx: minIdx,
+              minValue: a[minIdx],
+              scanRange: [i, n - 1],
+              sortedCount: i,
+              phase: 'min-updated'
+            },
+            description: `Cập nhật ${order === 'asc' ? 'min' : 'max'} mới: a[${minIdx}]=${a[minIdx]} (vị trí ${minIdx})`,
             line: 3
           });
         }
@@ -60,11 +105,38 @@ class SortingAlgorithms {
         steps.push({
           type: 'swap',
           indices: [i, minIdx],
+          loopContext: {
+            algorithm: 'selection',
+            outerIndex: i,
+            innerIndex: null,
+            minIdx: minIdx,
+            minValue: a[minIdx],
+            scanRange: [i, n - 1],
+            sortedCount: i,
+            phase: 'swapping'
+          },
           description: `Hoán đổi a[${i}]=${a[i]} ↔ a[${minIdx}]=${a[minIdx]}`,
           line: 5
         });
         [a[i], a[minIdx]] = [a[minIdx], a[i]];
         swaps++;
+      } else {
+        steps.push({
+          type: 'info',
+          indices: [i],
+          loopContext: {
+            algorithm: 'selection',
+            outerIndex: i,
+            innerIndex: null,
+            minIdx: i,
+            minValue: a[i],
+            scanRange: [i, n - 1],
+            sortedCount: i,
+            phase: 'no-swap-needed'
+          },
+          description: `Phần tử ${order === 'asc' ? 'nhỏ nhất' : 'lớn nhất'} đã đúng vị trí ${i}, không cần hoán đổi ✓`,
+          line: 5
+        });
       }
 
       steps.push({
@@ -111,6 +183,15 @@ class SortingAlgorithms {
       steps.push({
         type: 'info',
         indices: [i],
+        loopContext: {
+          algorithm: 'insertion',
+          outerIndex: i,
+          innerIndex: i - 1,
+          key: key,
+          keyIndex: i,
+          sortedCount: i,
+          phase: 'pick-key'
+        },
         description: `Chèn phần tử a[${i}]=${key} vào vị trí đúng`,
         line: 1
       });
@@ -118,11 +199,34 @@ class SortingAlgorithms {
       while (j >= 0) {
         comparisons++;
         const cond = order === 'asc' ? a[j] > key : a[j] < key;
+        const cmpResult = a[j] > key ? 'greater' : (a[j] < key ? 'less' : 'equal');
 
         steps.push({
           type: 'compare',
           indices: [j, i],
-          description: `So sánh a[${j}]=${a[j]} với key=${key}`,
+          comparedValues: [a[j], key],
+          comparisonResult: cmpResult,
+          willSwap: cond,
+          comparisonDetail: {
+            leftLabel: `a[${j}]`,
+            rightLabel: `key`,
+            leftValue: a[j],
+            rightValue: key,
+            operator: cmpResult === 'greater' ? '>' : (cmpResult === 'less' ? '<' : '='),
+            action: cond
+              ? `${a[j]} ${order === 'asc' ? '>' : '<'} ${key} → Dịch phải!`
+              : `${a[j]} ${order === 'asc' ? '≤' : '≥'} ${key} → Giữ nguyên ✓`
+          },
+          loopContext: {
+            algorithm: 'insertion',
+            outerIndex: i,
+            innerIndex: j,
+            key: key,
+            keyIndex: i,
+            sortedCount: i,
+            phase: 'comparing'
+          },
+          description: `So sánh a[${j}]=${a[j]} với key=${key} → ${cond ? 'Dịch phải!' : 'Giữ nguyên ✓'}`,
           line: 3
         });
 
@@ -183,20 +287,52 @@ class SortingAlgorithms {
       steps.push({
         type: 'info',
         indices: [],
+        loopContext: {
+          algorithm: 'bubble',
+          outerIndex: i,
+          pass: i + 1,
+          innerIndex: null,
+          boundary: n - i - 1,
+          sortedCount: i,
+          phase: 'start-pass'
+        },
         description: `Lượt duyệt thứ ${i + 1}`,
         line: 0
       });
 
       for (let j = 0; j < n - i - 1; j++) {
         comparisons++;
+        const cond = order === 'asc' ? a[j] > a[j + 1] : a[j] < a[j + 1];
+        const cmpResult = a[j] > a[j + 1] ? 'greater' : (a[j] < a[j + 1] ? 'less' : 'equal');
         steps.push({
           type: 'compare',
           indices: [j, j + 1],
-          description: `So sánh a[${j}]=${a[j]} với a[${j + 1}]=${a[j + 1]}`,
+          comparedValues: [a[j], a[j + 1]],
+          comparisonResult: cmpResult,
+          willSwap: cond,
+          comparisonDetail: {
+            leftLabel: `a[${j}]`,
+            rightLabel: `a[${j + 1}]`,
+            leftValue: a[j],
+            rightValue: a[j + 1],
+            operator: cmpResult === 'greater' ? '>' : (cmpResult === 'less' ? '<' : '='),
+            action: cond
+              ? `${a[j]} ${order === 'asc' ? '>' : '<'} ${a[j + 1]} → Hoán đổi!`
+              : `${a[j]} ${order === 'asc' ? '≤' : '≥'} ${a[j + 1]} → Giữ nguyên ✓`
+          },
+          loopContext: {
+            algorithm: 'bubble',
+            outerIndex: i,
+            pass: i + 1,
+            innerIndex: j,
+            boundary: n - i - 1,
+            sortedCount: i,
+            phase: 'comparing'
+          },
+          description: `So sánh a[${j}]=${a[j]} với a[${j + 1}]=${a[j + 1]} → ${cond ? 'Hoán đổi!' : 'Giữ nguyên ✓'}`,
           line: 2
         });
 
-        const cond = order === 'asc' ? a[j] > a[j + 1] : a[j] < a[j + 1];
         if (cond) {
           steps.push({
             type: 'swap',
@@ -207,6 +343,13 @@ class SortingAlgorithms {
           [a[j], a[j + 1]] = [a[j + 1], a[j]];
           swaps++;
           swapped = true;
+        } else {
+          steps.push({
+            type: 'no-swap',
+            indices: [j, j + 1],
+            description: `a[${j}]=${a[j]} ${order === 'asc' ? '≤' : '≥'} a[${j + 1}]=${a[j + 1]} → Giữ nguyên vị trí ✓`,
+            line: 2
+          });
         }
       }
 
@@ -265,16 +408,32 @@ class SortingAlgorithms {
 
       while (i < leftArr.length && j < rightArr.length) {
         comparisons++;
+        const lVal = leftArr[i], rVal = rightArr[j];
+        const cond = order === 'asc' ? lVal <= rVal : lVal >= rVal;
+        const cmpResult = lVal > rVal ? 'greater' : (lVal < rVal ? 'less' : 'equal');
         steps.push({
           type: 'compare',
           indices: [left + i, mid + 1 + j],
           range: [left, right],
           depth,
-          description: `So sánh nửa trái[${i}]=${leftArr[i]} với nửa phải[${j}]=${rightArr[j]}`,
+          comparedValues: [lVal, rVal],
+          comparisonResult: cmpResult,
+          willSwap: !cond,
+          comparisonDetail: {
+            leftLabel: `trái[${i}]`,
+            rightLabel: `phải[${j}]`,
+            leftValue: lVal,
+            rightValue: rVal,
+            operator: cmpResult === 'greater' ? '>' : (cmpResult === 'less' ? '<' : '='),
+            action: cond
+              ? `${lVal} ${order === 'asc' ? '≤' : '≥'} ${rVal} → Lấy từ nửa trái`
+              : `${lVal} ${order === 'asc' ? '>' : '<'} ${rVal} → Lấy từ nửa phải`
+          },
+          description: `So sánh trái[${i}]=${lVal} với phải[${j}]=${rVal} → ${cond ? 'Lấy từ nửa trái' : 'Lấy từ nửa phải'}`,
           line: 6
         });
 
-        const cond = order === 'asc' ? leftArr[i] <= rightArr[j] : leftArr[i] >= rightArr[j];
+        // cond already computed above
         if (cond) {
           a[k] = leftArr[i];
           steps.push({
@@ -437,7 +596,7 @@ class SortingAlgorithms {
         indices: [high],
         range: [low, high],
         depth,
-        description: `🎯 PIVOT (depth=${depth}): Chọn pivot = a[${high}] = ${pivot} trong [${low}..${high}]`,
+        description: `PIVOT (depth=${depth}): Chọn pivot = a[${high}] = ${pivot} trong [${low}..${high}]`,
         line: 1
       });
 
@@ -445,16 +604,31 @@ class SortingAlgorithms {
 
       for (let j = low; j < high; j++) {
         comparisons++;
+        const cond = order === 'asc' ? a[j] < pivot : a[j] > pivot;
+        const cmpResult = a[j] > pivot ? 'greater' : (a[j] < pivot ? 'less' : 'equal');
         steps.push({
           type: 'compare',
           indices: [j, high],
           range: [low, high],
           depth,
-          description: `So sánh a[${j}]=${a[j]} với pivot=${pivot}`,
+          comparedValues: [a[j], pivot],
+          comparisonResult: cmpResult,
+          willSwap: cond,
+          comparisonDetail: {
+            leftLabel: `a[${j}]`,
+            rightLabel: `pivot`,
+            leftValue: a[j],
+            rightValue: pivot,
+            operator: cmpResult === 'greater' ? '>' : (cmpResult === 'less' ? '<' : '='),
+            action: cond
+              ? `${a[j]} ${order === 'asc' ? '<' : '>'} ${pivot} → Đưa về bên ${order === 'asc' ? 'trái' : 'phải'}!`
+              : `${a[j]} ${order === 'asc' ? '≥' : '≤'} ${pivot} → Giữ nguyên ✓`
+          },
+          description: `So sánh a[${j}]=${a[j]} với pivot=${pivot} → ${cond ? 'Đưa về bên ' + (order === 'asc' ? 'trái' : 'phải') + '!' : 'Giữ nguyên ✓'}`,
           line: 3
         });
 
-        const cond = order === 'asc' ? a[j] < pivot : a[j] > pivot;
+        // cond already computed above
         if (cond) {
           i++;
           if (i !== j) {
@@ -793,7 +967,7 @@ class SortingAlgorithms {
         description: 'Chọn pivot, phân hoạch xung quanh pivot, đệ quy hai bên (Divide & Conquer).',
         pseudocode: [
           'quickSort(a, low, high): // ✂ DIVIDE',
-          '  pivot = a[high]         // 🎯 chọn pivot',
+          '  pivot = a[high]         // chọn pivot',
           '  i = low - 1',
           '  for j = low to high-1:  // quét & so sánh',
           '    if a[j] < pivot:',

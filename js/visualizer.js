@@ -79,11 +79,17 @@ class Visualizer {
             <option value="20">20</option>
             <option value="30" selected>30</option>
             <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="500">500 (Lag)</option>
+            <option value="1000">1000 (Lag)</option>
+            <option value="10000">10000 (Rất lag)</option>
+            <option value="50000">50000 (Treo máy)</option>
+            <option value="100000">100000 (Treo máy)</option>
           </select>
         </div>
 
         <button class="btn btn-success" id="vis-generate-btn">
-          <span>🎲</span> Tạo dữ liệu mới
+          <span><i class="fa-solid fa-shuffle"></i></span> Tạo dữ liệu mới
         </button>
       </div>
 
@@ -101,12 +107,40 @@ class Visualizer {
                 <div class="legend-item"><div class="legend-color pivot"></div> Pivot</div>
                 <div class="legend-item"><div class="legend-color sorted"></div> Đã sắp xếp</div>
                 <div class="legend-item"><div class="legend-color range-active"></div> Vùng xử lý</div>
+                <div class="legend-item"><div class="legend-color keep"></div> Giữ nguyên</div>
+                <div class="legend-item"><div class="legend-color current-min"></div> Phần tử MIN</div>
               </div>
             </div>
             
             <!-- Range indicator labels above chart -->
             <div class="range-labels" id="range-labels"></div>
             <div class="bar-chart show-values" id="bar-chart"></div>
+            <!-- Comparison Detail Panel -->
+            <div class="comparison-panel" id="comparison-panel">
+              <div class="comparison-content">
+                <div class="comparison-box left" id="cmp-left">
+                  <div class="cmp-label" id="cmp-left-label">a[0]</div>
+                  <div class="cmp-value" id="cmp-left-value">0</div>
+                </div>
+                <div class="comparison-operator" id="cmp-operator">
+                  <div class="cmp-op-symbol" id="cmp-op-symbol">></div>
+                </div>
+                <div class="comparison-box right" id="cmp-right">
+                  <div class="cmp-label" id="cmp-right-label">a[1]</div>
+                  <div class="cmp-value" id="cmp-right-value">0</div>
+                </div>
+              </div>
+              <div class="comparison-result" id="cmp-result">
+                <span class="cmp-result-icon" id="cmp-result-icon"><i class="fa-solid fa-bolt"></i></span>
+                <span class="cmp-result-text" id="cmp-result-text">Hoán đổi!</span>
+              </div>
+            </div>
+            <!-- Loop Tracker Panel -->
+            <div class="loop-tracker-panel" id="loop-tracker">
+              <div class="loop-tracker-title" id="loop-tracker-title">Trạng thái vòng lặp</div>
+              <div class="loop-tracker-vars" id="loop-tracker-vars"></div>
+              <div class="loop-tracker-progress" id="loop-tracker-progress"></div>
+            </div>
             <!-- Range bracket below chart -->
             <div class="range-bracket-row" id="range-bracket-row"></div>
 
@@ -134,16 +168,16 @@ class Visualizer {
 
             <!-- Controls -->
             <div class="vis-controls">
-              <button class="btn btn-icon tooltip" id="vis-reset-btn" data-tooltip="Reset">⏮</button>
-              <button class="btn btn-icon tooltip" id="vis-prev-btn" data-tooltip="Bước trước">⏪</button>
-              <button class="btn btn-icon btn-play tooltip" id="vis-play-btn" data-tooltip="Play/Pause">▶</button>
-              <button class="btn btn-icon tooltip" id="vis-next-btn" data-tooltip="Bước tiếp">⏩</button>
-              <button class="btn btn-icon tooltip" id="vis-end-btn" data-tooltip="Đến cuối">⏭</button>
+              <button class="btn btn-icon tooltip" id="vis-reset-btn" data-tooltip="Reset"><i class="fa-solid fa-backward-fast"></i></button>
+              <button class="btn btn-icon tooltip" id="vis-prev-btn" data-tooltip="Bước trước"><i class="fa-solid fa-backward-step"></i></button>
+              <button class="btn btn-icon btn-play tooltip" id="vis-play-btn" data-tooltip="Play/Pause"><i class="fa-solid fa-play"></i></button>
+              <button class="btn btn-icon tooltip" id="vis-next-btn" data-tooltip="Bước tiếp"><i class="fa-solid fa-forward-step"></i></button>
+              <button class="btn btn-icon tooltip" id="vis-end-btn" data-tooltip="Đến cuối"><i class="fa-solid fa-forward-fast"></i></button>
               
               <div class="speed-control">
-                <span>🐢</span>
+                <span><i class="fa-solid fa-gauge-low"></i></span>
                 <input type="range" id="vis-speed" min="1" max="10" value="5" />
-                <span>🐇</span>
+                <span><i class="fa-solid fa-gauge-high"></i></span>
                 <span class="speed-label" id="speed-label">5x</span>
               </div>
             </div>
@@ -188,7 +222,7 @@ class Visualizer {
           <!-- Pseudocode -->
           <div class="card pseudocode-card">
             <div class="card-header">
-              <div class="card-title">📝 Pseudocode</div>
+              <div class="card-title"><i class="fa-solid fa-code"></i> Pseudocode</div>
             </div>
             <div class="pseudocode" id="vis-pseudocode"></div>
           </div>
@@ -196,7 +230,7 @@ class Visualizer {
           <!-- Recursion Tree (only for merge/quick) -->
           <div class="card" id="recursion-tree-card" style="display: none;">
             <div class="card-header">
-              <div class="card-title">🌳 Đệ quy hiện tại</div>
+              <div class="card-title"><i class="fa-solid fa-sitemap"></i> Đệ quy hiện tại</div>
             </div>
             <div id="recursion-tree" style="font-size: 0.82rem; font-family: var(--font-mono); color: var(--text-secondary); line-height: 1.7;"></div>
           </div>
@@ -292,6 +326,8 @@ class Visualizer {
     this.updatePseudocode(-1);
     this.updateDCContext(null);
     this.renderRangeBrackets();
+    this.hideComparisonPanel();
+    this.hideLoopTracker();
 
     // Show/hide recursion tree card
     const treeCard = document.getElementById('recursion-tree-card');
@@ -304,6 +340,10 @@ class Visualizer {
 
     const maxVal = Math.max(...this.currentValues, 1);
     const n = this.currentValues.length;
+    
+    // Tự động điều chỉnh khoảng cách và kích thước thanh để chống tràn (bể giao diện)
+    chart.style.gap = n > 200 ? '0px' : (n > 50 ? '1px' : '2px');
+    const minWidth = n > 100 ? '0' : '4px';
 
     chart.innerHTML = this.currentValues.map((val, i) => {
       const height = (val / maxVal) * 100;
@@ -322,6 +362,10 @@ class Visualizer {
       if (highlightIndices.baseCase?.includes(i)) cls += ' base-case';
       if (highlightIndices.divideLeft?.includes(i)) cls += ' divide-left';
       if (highlightIndices.divideRight?.includes(i)) cls += ' divide-right';
+      if (highlightIndices.keep?.includes(i)) cls += ' keep-position';
+      if (highlightIndices.currentMin?.includes(i)) cls += ' current-min';
+      if (highlightIndices.scanPos?.includes(i)) cls += ' scan-position';
+      if (highlightIndices.outerIdx?.includes(i)) cls += ' outer-index';
 
       // Dim bars outside active range for D&C algorithms
       if (this.isDivideConquer && this.activeRange && !inRange && !this.sortedIndices.has(i)) {
@@ -333,8 +377,17 @@ class Visualizer {
         cls += ' midpoint';
       }
 
-      return `<div class="${cls}" style="height: ${Math.max(height, 2)}%" data-index="${i}">
-        <span class="bar-value">${typeof val === 'number' ? (val % 1 === 0 ? val : val.toFixed(1)) : val}</span>
+      let displayVal = typeof val === 'number' ? (val % 1 === 0 ? val : val.toFixed(1)) : val;
+      if (this.sortField === 'price' && typeof val === 'number') {
+        // Format tiền VNĐ chuẩn với ký hiệu VND
+        displayVal = val.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+      }
+
+      return `<div class="${cls}" style="height: ${Math.max(height, 2)}%; min-width: ${minWidth};" data-index="${i}" id="bar-${i}">
+        <span class="bar-value">${displayVal}</span>
+        ${highlightIndices.comparing?.includes(i) ? '<div class="bar-pointer">▼</div>' : ''}
+        ${highlightIndices.currentMin?.includes(i) ? '<div class="bar-min-badge">MIN</div>' : ''}
+        ${highlightIndices.outerIdx?.includes(i) ? '<div class="bar-i-badge">i=' + i + '</div>' : ''}
       </div>`;
     }).join('');
   }
@@ -453,10 +506,22 @@ class Visualizer {
       this.activeMidPoint = step.midPoint;
     }
 
+    // Extract outer loop index from loopContext to highlight position i
+    if (step.loopContext && step.loopContext.outerIndex !== undefined) {
+      highlights.outerIdx = [step.loopContext.outerIndex];
+    }
+
     switch (step.type) {
       case 'compare':
         highlights.comparing = step.indices;
         this.comparisons++;
+        // Show current min for selection sort
+        if (step.loopContext?.algorithm === 'selection' && step.loopContext.minIdx !== undefined) {
+          highlights.currentMin = [step.loopContext.minIdx];
+        }
+        break;
+      case 'min-update':
+        highlights.currentMin = step.indices;
         break;
       case 'swap':
         highlights.swapping = step.indices;
@@ -508,6 +573,9 @@ class Visualizer {
         highlights.pivot = step.indices;
         this.sortedIndices.add(step.indices[0]);
         break;
+      case 'no-swap':
+        highlights.keep = step.indices;
+        break;
       case 'done':
         this.activeRange = null;
         this.activeMidPoint = null;
@@ -519,6 +587,9 @@ class Visualizer {
 
     this.renderBars(highlights);
     this.renderRangeBrackets();
+    this.updateComparisonPanel(step);
+    this.updateLoopTracker(step);
+    this.animateStep(step, highlights);
     this.updateStepInfo();
     this.updateStats();
     this.updatePseudocode(step.line);
@@ -574,6 +645,10 @@ class Visualizer {
       case 'recurse-right':
         this.activeMidPoint = null;
         break;
+      case 'no-swap':
+        break;
+      case 'min-update':
+        break;
     }
   }
 
@@ -592,7 +667,7 @@ class Visualizer {
 
     this.isPlaying = true;
     const playBtn = document.getElementById('vis-play-btn');
-    if (playBtn) playBtn.textContent = '⏸';
+    if (playBtn) playBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
 
     const delay = Math.max(20, 500 / this.speed);
 
@@ -613,7 +688,7 @@ class Visualizer {
     this.isPlaying = false;
     clearTimeout(this.playTimer);
     const playBtn = document.getElementById('vis-play-btn');
-    if (playBtn) playBtn.textContent = '▶';
+    if (playBtn) playBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
   }
 
   stop() {
@@ -632,6 +707,8 @@ class Visualizer {
     this.activeMidPoint = null;
     this.renderBars();
     this.renderRangeBrackets();
+    this.hideComparisonPanel();
+    this.hideLoopTracker();
     this.updateStepInfo();
     this.updateStats();
     this.updatePseudocode(-1);
@@ -764,16 +841,16 @@ class Visualizer {
         'recurse-right': '↘ ĐỆ QUY PHẢI',
         'merge-start': '⤵ CONQUER - Trộn',
         'merge': '⤵ Đang trộn...',
-        'merge-done': '✓ Đã trộn xong',
-        'compare': '🔍 So sánh',
-        'swap': '🔄 Hoán đổi',
-        'pivot': '🎯 Chọn Pivot',
-        'partition-done': '✓ Phân hoạch xong',
+        'merge-done': '<i class="fa-solid fa-check"></i> Đã trộn xong',
+        'compare': '<i class="fa-solid fa-magnifying-glass"></i> So sánh',
+        'swap': '<i class="fa-solid fa-right-left"></i> Hoán đổi',
+        'pivot': '<i class="fa-solid fa-crosshairs"></i> Chọn Pivot',
+        'partition-done': '<i class="fa-solid fa-check"></i> Phân hoạch xong',
         'base-case': '■ Base Case',
-        'sorted': '✓ Đã sắp xếp',
-        'info': 'ℹ Thông tin'
+        'sorted': '<i class="fa-solid fa-check"></i> Đã sắp xếp',
+        'info': '<i class="fa-solid fa-circle-info"></i> Thông tin'
       };
-      phaseEl.textContent = phaseMap[step.type] || step.type;
+      phaseEl.innerHTML = phaseMap[step.type] || step.type;
 
       // Color the phase
       const phaseColors = {
@@ -837,7 +914,7 @@ class Visualizer {
         label = `MERGE [${l}..${step.midPoint}] + [${(step.midPoint||0)+1}..${r}]`;
         break;
       case 'merge-done':
-        icon = '✓';
+        icon = '<i class="fa-solid fa-check"></i>';
         label = `MERGED [${l}..${r}]`;
         break;
       case 'base-case':
@@ -845,11 +922,11 @@ class Visualizer {
         label = `BASE [${l}]=${this.currentValues[l]}`;
         break;
       case 'pivot':
-        icon = '🎯';
+        icon = '<i class="fa-solid fa-crosshairs"></i>';
         label = `PIVOT @ [${l}..${r}]`;
         break;
       case 'partition-done':
-        icon = '✓';
+        icon = '<i class="fa-solid fa-check"></i>';
         label = `PARTITIONED → pivot@${step.pivotIndex}`;
         break;
       default:
@@ -886,6 +963,326 @@ class Visualizer {
         Mid: ${step.midPoint} → Trái[${l}..${step.midPoint}] | Phải[${step.midPoint+1}..${r}]
       </div>` : ''}
     `;
+  }
+
+  // ======== Comparison Panel ========
+  updateComparisonPanel(step) {
+    const panel = document.getElementById('comparison-panel');
+    if (!panel) return;
+
+    // Only show for compare steps with detail info
+    if (step.type === 'compare' && step.comparisonDetail) {
+      const d = step.comparisonDetail;
+      panel.classList.add('panel-visible');
+
+      // Left box
+      const leftLabel = document.getElementById('cmp-left-label');
+      const leftValue = document.getElementById('cmp-left-value');
+      const leftBox = document.getElementById('cmp-left');
+      if (leftLabel) leftLabel.textContent = d.leftLabel;
+      if (leftValue) leftValue.textContent = typeof d.leftValue === 'number' ? (d.leftValue % 1 === 0 ? d.leftValue : d.leftValue.toFixed(1)) : d.leftValue;
+
+      // Right box
+      const rightLabel = document.getElementById('cmp-right-label');
+      const rightValue = document.getElementById('cmp-right-value');
+      const rightBox = document.getElementById('cmp-right');
+      if (rightLabel) rightLabel.textContent = d.rightLabel;
+      if (rightValue) rightValue.textContent = typeof d.rightValue === 'number' ? (d.rightValue % 1 === 0 ? d.rightValue : d.rightValue.toFixed(1)) : d.rightValue;
+
+      // Operator
+      const opSymbol = document.getElementById('cmp-op-symbol');
+      if (opSymbol) opSymbol.textContent = d.operator;
+
+      // Result
+      const resultIcon = document.getElementById('cmp-result-icon');
+      const resultText = document.getElementById('cmp-result-text');
+      const resultEl = document.getElementById('cmp-result');
+
+      if (resultEl && resultIcon && resultText) {
+        resultText.textContent = d.action;
+        if (step.willSwap) {
+          resultEl.className = 'comparison-result result-swap';
+          resultIcon.innerHTML = '<i class="fa-solid fa-bolt"></i>';
+          if (leftBox) leftBox.className = 'comparison-box left swap';
+          if (rightBox) rightBox.className = 'comparison-box right swap';
+        } else {
+          resultEl.className = 'comparison-result result-keep';
+          resultIcon.innerHTML = '<i class="fa-solid fa-check"></i>';
+          if (leftBox) leftBox.className = 'comparison-box left keep';
+          if (rightBox) rightBox.className = 'comparison-box right keep';
+        }
+      }
+
+      // Animate panel entrance
+      panel.classList.remove('panel-animate');
+      void panel.offsetWidth; // force reflow
+      panel.classList.add('panel-animate');
+
+    } else if (step.type === 'no-swap') {
+      // Show keep result for no-swap steps
+      panel.classList.add('panel-visible');
+      const resultEl = document.getElementById('cmp-result');
+      const resultIcon = document.getElementById('cmp-result-icon');
+      const resultText = document.getElementById('cmp-result-text');
+      const leftBox = document.getElementById('cmp-left');
+      const rightBox = document.getElementById('cmp-right');
+      if (resultEl) resultEl.className = 'comparison-result result-keep';
+      if (resultIcon) resultIcon.innerHTML = '<i class="fa-solid fa-check"></i>';
+      if (resultText) resultText.textContent = step.description;
+      if (leftBox) leftBox.className = 'comparison-box left keep';
+      if (rightBox) rightBox.className = 'comparison-box right keep';
+
+    } else if (step.type === 'swap') {
+      // Update panel to show swap happening
+      const resultEl = document.getElementById('cmp-result');
+      const resultIcon = document.getElementById('cmp-result-icon');
+      const resultText = document.getElementById('cmp-result-text');
+      if (resultEl) resultEl.className = 'comparison-result result-swap';
+      if (resultIcon) resultIcon.innerHTML = '<i class="fa-solid fa-right-left"></i>';
+      if (resultText) resultText.textContent = step.description;
+
+    } else if (step.type === 'min-update') {
+      // Show min update notification
+      panel.classList.add('panel-visible');
+      const resultEl = document.getElementById('cmp-result');
+      const resultIcon = document.getElementById('cmp-result-icon');
+      const resultText = document.getElementById('cmp-result-text');
+      const leftBox = document.getElementById('cmp-left');
+      const rightBox = document.getElementById('cmp-right');
+      if (resultEl) resultEl.className = 'comparison-result result-min-update';
+      if (resultIcon) resultIcon.innerHTML = '<i class="fa-solid fa-crosshairs"></i>';
+      if (resultText) resultText.textContent = step.description;
+      if (leftBox) leftBox.className = 'comparison-box left min-updated';
+      if (rightBox) rightBox.className = 'comparison-box right min-updated';
+
+      panel.classList.remove('panel-animate');
+      void panel.offsetWidth;
+      panel.classList.add('panel-animate');
+
+    } else {
+      panel.classList.remove('panel-visible');
+    }
+  }
+
+  hideComparisonPanel() {
+    const panel = document.getElementById('comparison-panel');
+    if (panel) panel.classList.remove('panel-visible');
+  }
+
+  animateStep(step, highlights) {
+    // Add swap animation to bars
+    if (step.type === 'swap' && step.indices.length === 2) {
+      const [i, j] = step.indices;
+      const barI = document.getElementById(`bar-${i}`);
+      const barJ = document.getElementById(`bar-${j}`);
+      if (barI && barJ) {
+        // Calculate the distance to swap
+        const rectI = barI.getBoundingClientRect();
+        const rectJ = barJ.getBoundingClientRect();
+        const distance = rectJ.left - rectI.left;
+
+        barI.style.transition = 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
+        barJ.style.transition = 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
+        barI.style.transform = `translateX(${distance}px)`;
+        barJ.style.transform = `translateX(${-distance}px)`;
+
+        // Reset after animation
+        setTimeout(() => {
+          barI.style.transition = '';
+          barI.style.transform = '';
+          barJ.style.transition = '';
+          barJ.style.transform = '';
+        }, 380);
+      }
+    }
+
+    // Keep-position pulse for no-swap
+    if (step.type === 'no-swap' && step.indices.length === 2) {
+      const [i, j] = step.indices;
+      const barI = document.getElementById(`bar-${i}`);
+      const barJ = document.getElementById(`bar-${j}`);
+      if (barI) barI.classList.add('keep-pulse');
+      if (barJ) barJ.classList.add('keep-pulse');
+      setTimeout(() => {
+        if (barI) barI.classList.remove('keep-pulse');
+        if (barJ) barJ.classList.remove('keep-pulse');
+      }, 500);
+    }
+  }
+
+  // ======== Loop Tracker Panel ========
+  updateLoopTracker(step) {
+    const panel = document.getElementById('loop-tracker');
+    if (!panel) return;
+
+    const ctx = step.loopContext;
+    if (!ctx) {
+      panel.classList.remove('panel-visible');
+      return;
+    }
+
+    panel.classList.add('panel-visible');
+    const title = document.getElementById('loop-tracker-title');
+    const vars = document.getElementById('loop-tracker-vars');
+    const progress = document.getElementById('loop-tracker-progress');
+
+    const n = this.currentValues.length;
+
+    if (ctx.algorithm === 'selection') {
+      if (title) title.innerHTML = '<i class="fa-solid fa-rotate"></i> Selection Sort - Tr\u1EA1ng th\u00E1i v\u00F2ng l\u1EB7p';
+
+      // Phase description
+      const phaseText = {
+        'start-scan': '<i class="fa-solid fa-magnifying-glass"></i> B\u1EAFt \u0111\u1EA7u qu\u00E9t t\u00ECm min',
+        'comparing': '<i class="fa-solid fa-magnifying-glass"></i> \u0110ang so s\u00E1nh...',
+        'min-updated': '<i class="fa-solid fa-bolt"></i> \u0110\u00E3 c\u1EADp nh\u1EADt min m\u1EDBi!',
+        'swapping': '<i class="fa-solid fa-right-left"></i> \u0110ang ho\u00E1n \u0111\u1ED5i...',
+        'no-swap-needed': '<i class="fa-solid fa-check"></i> Kh\u00F4ng c\u1EA7n ho\u00E1n \u0111\u1ED5i'
+      };
+
+      if (vars) {
+        vars.innerHTML = `
+          <div class="lt-var">
+            <span class="lt-var-name">i (v\u1ECB tr\u00ED \u0111\u1EB7t)</span>
+            <span class="lt-var-value lt-cyan">${ctx.outerIndex}</span>
+          </div>
+          ${ctx.innerIndex !== null ? `<div class="lt-var">
+            <span class="lt-var-name">j (\u0111ang x\u00E9t)</span>
+            <span class="lt-var-value lt-yellow">${ctx.innerIndex}</span>
+          </div>` : ''}
+          <div class="lt-var lt-highlight-min">
+            <span class="lt-var-name"><i class="fa-solid fa-crosshairs"></i> minIdx</span>
+            <span class="lt-var-value lt-orange">${ctx.minIdx}</span>
+          </div>
+          <div class="lt-var lt-highlight-min">
+            <span class="lt-var-name"><i class="fa-solid fa-chart-simple"></i> minValue</span>
+            <span class="lt-var-value lt-orange">${typeof ctx.minValue === 'number' ? (ctx.minValue % 1 === 0 ? ctx.minValue : ctx.minValue.toFixed(1)) : ctx.minValue}</span>
+          </div>
+          <div class="lt-var">
+            <span class="lt-var-name">\u0110\u00E3 s\u1EAFp x\u1EBFp</span>
+            <span class="lt-var-value lt-green">${ctx.sortedCount} / ${n}</span>
+          </div>
+        `;
+      }
+
+      if (progress) {
+        const scanTotal = n - ctx.outerIndex - 1;
+        const scanDone = ctx.innerIndex !== null ? ctx.innerIndex - ctx.outerIndex : 0;
+        const scanPct = scanTotal > 0 ? Math.round((scanDone / scanTotal) * 100) : 0;
+        const sortedPct = Math.round((ctx.sortedCount / n) * 100);
+        progress.innerHTML = `
+          <div class="lt-progress-row">
+            <span class="lt-progress-label">Qu\u00E9t v\u00F2ng ${ctx.outerIndex + 1}</span>
+            <div class="lt-progress-bar">
+              <div class="lt-progress-fill lt-fill-yellow" style="width: ${scanPct}%"></div>
+            </div>
+            <span class="lt-progress-pct">${scanPct}%</span>
+          </div>
+          <div class="lt-progress-row">
+            <span class="lt-progress-label">T\u1ED5ng ti\u1EBFn \u0111\u1ED9</span>
+            <div class="lt-progress-bar">
+              <div class="lt-progress-fill lt-fill-green" style="width: ${sortedPct}%"></div>
+            </div>
+            <span class="lt-progress-pct">${sortedPct}%</span>
+          </div>
+          <div class="lt-phase ${ctx.phase === 'min-updated' ? 'lt-phase-alert' : ''}">
+            ${phaseText[ctx.phase] || ctx.phase}
+          </div>
+        `;
+      }
+
+    } else if (ctx.algorithm === 'insertion') {
+      if (title) title.innerHTML = '<i class="fa-solid fa-arrow-left"></i> Insertion Sort - Tr\u1EA1ng th\u00E1i v\u00F2ng l\u1EB7p';
+
+      if (vars) {
+        vars.innerHTML = `
+          <div class="lt-var">
+            <span class="lt-var-name">i (ch\u1ECDn ph\u1EA7n t\u1EED)</span>
+            <span class="lt-var-value lt-cyan">${ctx.outerIndex}</span>
+          </div>
+          <div class="lt-var lt-highlight-key">
+            <span class="lt-var-name"><i class="fa-solid fa-key"></i> key</span>
+            <span class="lt-var-value lt-purple">${typeof ctx.key === 'number' ? (ctx.key % 1 === 0 ? ctx.key : ctx.key.toFixed(1)) : ctx.key}</span>
+          </div>
+          <div class="lt-var">
+            <span class="lt-var-name">j (so s\u00E1nh v\u1EDBi)</span>
+            <span class="lt-var-value lt-yellow">${ctx.innerIndex}</span>
+          </div>
+          <div class="lt-var">
+            <span class="lt-var-name">\u0110\u00E3 s\u1EAFp x\u1EBFp</span>
+            <span class="lt-var-value lt-green">${ctx.sortedCount} / ${n}</span>
+          </div>
+        `;
+      }
+
+      if (progress) {
+        const sortedPct = Math.round((ctx.sortedCount / n) * 100);
+        progress.innerHTML = `
+          <div class="lt-progress-row">
+            <span class="lt-progress-label">T\u1ED5ng ti\u1EBFn \u0111\u1ED9</span>
+            <div class="lt-progress-bar">
+              <div class="lt-progress-fill lt-fill-green" style="width: ${sortedPct}%"></div>
+            </div>
+            <span class="lt-progress-pct">${sortedPct}%</span>
+          </div>
+          <div class="lt-phase">
+            ${ctx.phase === 'pick-key' ? '<i class="fa-solid fa-key"></i> Ch\u1ECDn key = ' + (typeof ctx.key === 'number' ? (ctx.key % 1 === 0 ? ctx.key : ctx.key.toFixed(1)) : ctx.key) : '<i class="fa-solid fa-magnifying-glass"></i> So s\u00E1nh v\u00E0 d\u1ECBch ph\u1EA3i...'}
+          </div>
+        `;
+      }
+
+    } else if (ctx.algorithm === 'bubble') {
+      if (title) title.innerHTML = '<i class="fa-solid fa-wind"></i> Bubble Sort - Tr\u1EA1ng th\u00E1i v\u00F2ng l\u1EB7p';
+
+      if (vars) {
+        vars.innerHTML = `
+          <div class="lt-var">
+            <span class="lt-var-name">L\u01B0\u1EE3t (pass)</span>
+            <span class="lt-var-value lt-cyan">${ctx.pass} / ${n - 1}</span>
+          </div>
+          ${ctx.innerIndex !== null ? `<div class="lt-var">
+            <span class="lt-var-name">j (\u0111ang x\u00E9t)</span>
+            <span class="lt-var-value lt-yellow">${ctx.innerIndex}</span>
+          </div>` : ''}
+          <div class="lt-var">
+            <span class="lt-var-name">Ranh gi\u1EDBi</span>
+            <span class="lt-var-value lt-orange">${ctx.boundary}</span>
+          </div>
+          <div class="lt-var">
+            <span class="lt-var-name">\u0110\u00E3 s\u1EAFp x\u1EBFp</span>
+            <span class="lt-var-value lt-green">${ctx.sortedCount} / ${n}</span>
+          </div>
+        `;
+      }
+
+      if (progress) {
+        const passTotal = ctx.boundary;
+        const passDone = ctx.innerIndex !== null ? ctx.innerIndex : 0;
+        const passPct = passTotal > 0 ? Math.round((passDone / passTotal) * 100) : 0;
+        const sortedPct = Math.round((ctx.sortedCount / n) * 100);
+        progress.innerHTML = `
+          <div class="lt-progress-row">
+            <span class="lt-progress-label">L\u01B0\u1EE3t ${ctx.pass}</span>
+            <div class="lt-progress-bar">
+              <div class="lt-progress-fill lt-fill-yellow" style="width: ${passPct}%"></div>
+            </div>
+            <span class="lt-progress-pct">${passPct}%</span>
+          </div>
+          <div class="lt-progress-row">
+            <span class="lt-progress-label">T\u1ED5ng ti\u1EBFn \u0111\u1ED9</span>
+            <div class="lt-progress-bar">
+              <div class="lt-progress-fill lt-fill-green" style="width: ${sortedPct}%"></div>
+            </div>
+            <span class="lt-progress-pct">${sortedPct}%</span>
+          </div>
+        `;
+      }
+    }
+  }
+
+  hideLoopTracker() {
+    const panel = document.getElementById('loop-tracker');
+    if (panel) panel.classList.remove('panel-visible');
   }
 }
 

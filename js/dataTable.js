@@ -14,6 +14,7 @@ class DataTable {
     this.sortOrder = 'asc';
     this.sortAlgorithm = 'selection';
     this.searchQuery = '';
+    this.dataLimit = 100000;
     this.lastSortResult = null;
     this.isInitialized = false;
   }
@@ -31,7 +32,7 @@ class DataTable {
       console.error('Failed to load data:', error);
       this.container.innerHTML = `
         <div class="empty-state">
-          <div class="icon">⚠️</div>
+          <div class="icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
           <p>Không thể tải dữ liệu. Vui lòng kiểm tra file data.json</p>
         </div>
       `;
@@ -43,7 +44,7 @@ class DataTable {
       <!-- Controls -->
       <div class="controls-bar" id="table-controls">
         <div class="search-wrapper">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
           <input type="search" id="search-input" placeholder="Tìm kiếm sản phẩm..." />
         </div>
 
@@ -55,6 +56,29 @@ class DataTable {
             <option value="bubble">Bubble Sort</option>
             <option value="merge">Merge Sort</option>
             <option value="quick">Quick Sort</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label>Dữ liệu (Tối đa):</label>
+          <select id="data-size-select">
+            <option value="1000">1.000 phần tử</option>
+            <option value="5000">5.000 phần tử</option>
+            <option value="10000">10.000 phần tử</option>
+            <option value="50000">50.000 phần tử</option>
+            <option value="100000" selected>Toàn bộ (100k)</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label>Hiển thị:</label>
+          <select id="page-size-select">
+            <option value="20" selected>20 dòng/trang</option>
+            <option value="50">50 dòng/trang</option>
+            <option value="100">100 dòng/trang</option>
+            <option value="500">500 dòng/trang</option>
+            <option value="1000">1000 dòng/trang</option>
+            <option value="100000">Tất cả (Rất lag)</option>
           </select>
         </div>
 
@@ -78,11 +102,11 @@ class DataTable {
         </div>
 
         <button class="btn btn-primary" id="sort-btn">
-          <span>⚡</span> Sắp xếp
+          <span><i class="fa-solid fa-bolt"></i></span> Sắp xếp
         </button>
 
         <button class="btn btn-secondary" id="reset-btn">
-          <span>🔄</span> Reset
+          <span><i class="fa-solid fa-rotate"></i></span> Reset
         </button>
       </div>
 
@@ -117,7 +141,7 @@ class DataTable {
             <tr>
               <th data-field="id" style="width: 60px">#</th>
               <th data-field="name">Tên sản phẩm</th>
-              <th data-field="price">Giá ($)</th>
+              <th data-field="price">Giá (VNĐ)</th>
               <th data-field="rating">Đánh giá</th>
               <th data-field="stock">Tồn kho</th>
             </tr>
@@ -159,7 +183,7 @@ class DataTable {
         <td>
           <div style="font-weight: 500;">${this.escapeHtml(item.name)}</div>
         </td>
-        <td class="price-cell">$${Number(item.price).toFixed(2)}</td>
+        <td class="price-cell">${Number(item.price).toLocaleString('vi-VN', { style: 'currency', currency: 'VND' })}</td>
         <td>
           <div class="rating-stars">
             ${this.renderStars(item.rating)}
@@ -179,11 +203,11 @@ class DataTable {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
       if (i <= Math.floor(rating)) {
-        stars.push('★');
+        stars.push('<i class="fa-solid fa-star" style="color: var(--accent-yellow)"></i>');
       } else if (i - 0.5 <= rating) {
-        stars.push('⯪');
+        stars.push('<i class="fa-solid fa-star-half-stroke" style="color: var(--accent-yellow)"></i>');
       } else {
-        stars.push('<span style="opacity: 0.3">★</span>');
+        stars.push('<i class="fa-regular fa-star" style="opacity: 0.3"></i>');
       }
     }
     return stars.join('');
@@ -270,6 +294,29 @@ class DataTable {
       });
     }
 
+    // Data Size select
+    const dataSizeSelect = document.getElementById('data-size-select');
+    if (dataSizeSelect) {
+      dataSizeSelect.addEventListener('change', (e) => {
+        this.dataLimit = parseInt(e.target.value);
+        this.applyFilters();
+        if (window.app) {
+          window.app.showToast(`Đã giới hạn dữ liệu ở mức ${this.dataLimit.toLocaleString()} phần tử`, 'info');
+        }
+      });
+    }
+
+    // Page Size select
+    const pageSizeSelect = document.getElementById('page-size-select');
+    if (pageSizeSelect) {
+      pageSizeSelect.addEventListener('change', (e) => {
+        this.pageSize = parseInt(e.target.value);
+        this.currentPage = 1;
+        this.renderTableBody();
+        this.renderPagination();
+      });
+    }
+
     // Field select
     const fieldSelect = document.getElementById('field-select');
     if (fieldSelect) {
@@ -323,7 +370,8 @@ class DataTable {
   }
 
   applyFilters() {
-    this.filteredData = this.allData.filter(item => {
+    const baseData = this.allData.slice(0, this.dataLimit);
+    this.filteredData = baseData.filter(item => {
       if (this.searchQuery && !item.name.toLowerCase().includes(this.searchQuery)) {
         return false;
       }
@@ -344,6 +392,19 @@ class DataTable {
 
     // For string sorting, we need numeric comparison
     let numericValues;
+    
+    // Bảo vệ trình duyệt: Không chạy O(N^2) trên dữ liệu > 10,000
+    if (values.length > 10000 && (this.sortAlgorithm === 'selection' || this.sortAlgorithm === 'insertion' || this.sortAlgorithm === 'bubble')) {
+      if (window.app) {
+        window.app.showToast(`Dữ liệu quá lớn (${values.length.toLocaleString()} mục) để chạy ${this.sortAlgorithm} (O(N²)). Vui lòng dùng Merge hoặc Quick Sort!`, 'error');
+      }
+      const sortBtn = document.getElementById('sort-btn');
+      if (sortBtn) {
+        sortBtn.disabled = false;
+        sortBtn.innerHTML = '<span><i class="fa-solid fa-bolt"></i></span> Sắp xếp';
+      }
+      return;
+    }
     if (field === 'name') {
       // Create index-based sorting using string comparison
       const indices = values.map((_, i) => i);
@@ -500,6 +561,7 @@ class DataTable {
   }
 
   reset() {
+    this.dataLimit = 100000;
     this.filteredData = [...this.allData];
     this.currentPage = 1;
     this.searchQuery = '';
@@ -507,6 +569,15 @@ class DataTable {
 
     const searchInput = document.getElementById('search-input');
     if (searchInput) searchInput.value = '';
+    
+    const dataSizeSelect = document.getElementById('data-size-select');
+    if (dataSizeSelect) dataSizeSelect.value = '100000';
+
+    const pageSizeSelect = document.getElementById('page-size-select');
+    if (pageSizeSelect) {
+      pageSizeSelect.value = '20';
+      this.pageSize = 20;
+    }
 
     const statsEl = document.getElementById('sort-stats');
     if (statsEl) statsEl.style.display = 'none';
@@ -527,7 +598,8 @@ class DataTable {
     const avgPrice = document.getElementById('stat-avg-price');
     if (avgPrice) {
       const avg = this.allData.reduce((sum, item) => sum + Number(item.price), 0) / this.allData.length;
-      avgPrice.textContent = `$${avg.toFixed(2)}`;
+      avgPrice.textContent = avg.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+      avgPrice.style.fontSize = '1.4rem'; // Ngăn chặn text quá dài làm lệch UI của card
     }
 
     const avgRating = document.getElementById('stat-avg-rating');
