@@ -96,6 +96,7 @@ class Visualizer {
             <option value="nearly">Gần sắp xếp</option>
             <option value="reversed">Đảo ngược</option>
             <option value="few">Ít giá trị</option>
+            <option value="stability-test">Kiểm tra Ổn định (Stability)</option>
           </select>
         </div>
 
@@ -177,6 +178,11 @@ class Visualizer {
               </div>
             </div>
 
+            <!-- Timeline Scrubber -->
+            <div class="timeline-container" style="padding: 10px 20px; background: var(--bg-card); border-top: 1px solid var(--border-color);">
+              <input type="range" id="vis-timeline" min="0" max="0" value="0" style="width: 100%; cursor: pointer;" disabled>
+            </div>
+
             <!-- Controls -->
             <div class="vis-controls">
               <button class="btn btn-icon tooltip" id="vis-reset-btn" data-tooltip="Reset"><i class="fa-solid fa-backward-fast"></i></button>
@@ -207,6 +213,10 @@ class Visualizer {
             <div class="vis-stat">
               <div class="label">Số hoán đổi</div>
               <div class="value red" id="vis-swaps">0</div>
+            </div>
+            <div class="vis-stat">
+              <div class="label" id="vis-memory-label">Bộ nhớ / Call Stack</div>
+              <div class="value purple" id="vis-memory-val">0</div>
             </div>
           </div>
         </div>
@@ -285,6 +295,15 @@ class Visualizer {
       this.generateSample();
     });
 
+    // Timeline scrubber
+    const timeline = document.getElementById('vis-timeline');
+    if (timeline) {
+      timeline.addEventListener('input', (e) => {
+        this.pause();
+        this.goToStep(parseInt(e.target.value));
+      });
+    }
+
     document.getElementById('vis-generate-btn')?.addEventListener('click', () => {
       this.generateSample();
       if (window.app) {
@@ -360,14 +379,34 @@ class Visualizer {
         const uniques = [...new Set(values)].slice(0, 5);
         values = values.map(() => uniques[Math.floor(Math.random() * uniques.length)]);
         break;
+      case 'stability-test':
+        // Generate only 3 distinct values, repeated
+        const dist = [10000, 20000, 30000];
+        values = values.map(() => dist[Math.floor(Math.random() * dist.length)]);
+        break;
     }
 
-    this.currentValues = values.map(wrapValue);
-    this.originalData = values.map(wrapValue);
+    this.currentValues = values.map((v, i) => {
+      const obj = wrapValue(v);
+      if (this.dataType === 'stability-test') {
+        obj._originalIndex = i;
+        obj._colorHue = (v / 30000) * 360; // unique hue per value group
+      }
+      return obj;
+    });
+    this.originalData = [...this.currentValues];
 
     // Run algorithm to get steps
     this.result = SortingAlgorithms.run(this.algorithm, this.currentValues, this.sortOrder);
     this.steps = this.result.steps;
+
+    // Reset timeline scrubber
+    const timeline = document.getElementById('vis-timeline');
+    if (timeline) {
+      timeline.max = this.steps.length;
+      timeline.value = 0;
+      timeline.disabled = this.steps.length === 0;
+    }
 
     this.renderBars();
     this.updateStepInfo();
@@ -433,8 +472,17 @@ class Visualizer {
         displayVal = val.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
       }
 
-      return `<div class="${cls}" style="height: ${Math.max(height, 2)}%; min-width: ${minWidth};" data-index="${i}" id="bar-${i}">
+      // Custom style for Stability Test
+      let customStyle = '';
+      let extraLabelHtml = '';
+      if (this.dataType === 'stability-test' && val._originalIndex !== undefined) {
+        customStyle = `background: hsl(${val._colorHue || 0}, 70%, 50%) !important;`;
+        extraLabelHtml = `<div style="position: absolute; bottom: 5px; width: 100%; text-align: center; color: white; font-weight: bold; font-size: 10px; text-shadow: 0 1px 2px black;">#${val._originalIndex}</div>`;
+      }
+
+      return `<div class="${cls}" style="height: ${Math.max(height, 2)}%; min-width: ${minWidth}; ${customStyle}" data-index="${i}" id="bar-${i}">
         <span class="bar-value">${displayVal}</span>
+        ${extraLabelHtml}
         ${highlightIndices.comparing?.includes(i) ? '<div class="bar-pointer">▼</div>' : ''}
         ${highlightIndices.currentMin?.includes(i) ? '<div class="bar-min-badge">MIN</div>' : ''}
         ${highlightIndices.outerIdx?.includes(i) ? '<div class="bar-i-badge">i=' + i + '</div>' : ''}
@@ -504,6 +552,10 @@ class Visualizer {
 
     this.currentStep++;
     this.applyStep(this.currentStep);
+    
+    const timeline = document.getElementById('vis-timeline');
+    if (timeline) timeline.value = this.currentStep;
+    
     return true;
   }
 
@@ -537,6 +589,63 @@ class Visualizer {
 
     this.updateStepInfo();
     this.updateStats();
+  }
+
+  goToStep(targetStep) {
+    if (targetStep < -1) targetStep = -1;
+    if (targetStep >= this.steps.length) targetStep = this.steps.length;
+    
+    // Reset and replay up to targetStep
+    this.currentValues = [...this.originalData];
+    this.sortedIndices = new Set();
+    this.comparisons = 0;
+    this.swapsCount = 0;
+    this.activeRange = null;
+    this.activeDepth = 0;
+    this.activeMidPoint = null;
+
+    this.currentStep = -1;
+    
+    // Apply silently up to targetStep - 1
+    for (let i = 0; i < targetStep; i++) {
+      this.currentStep = i;
+      this.applyStepSilent(i);
+    }
+
+    if (targetStep < 0) {
+      this.currentStep = -1;
+      this.renderBars();
+      this.updateStepInfo();
+      this.updateStats();
+      this.updatePseudocode(-1);
+      this.hideComparisonPanel();
+      this.hideLoopTracker();
+      this.updateDCContext(null);
+      this.renderRangeBrackets();
+      const timeline = document.getElementById('vis-timeline');
+      if (timeline) timeline.value = 0;
+    } else if (targetStep === this.steps.length) {
+      this.currentStep = targetStep - 1;
+      for (let i = 0; i < this.currentValues.length; i++) this.sortedIndices.add(i);
+      this.renderBars();
+      this.updateStepInfo();
+      this.updateStats();
+      document.getElementById('step-description').innerHTML = `<span style="color: var(--accent-green-light);"><i class="fa-solid fa-check-circle"></i> Đã sắp xếp xong ${this.sampleSize} phần tử!</span>`;
+      this.hideComparisonPanel();
+      this.hideLoopTracker();
+      this.updateDCContext(null);
+      this.renderRangeBrackets();
+      this.checkStability();
+      
+      const timeline = document.getElementById('vis-timeline');
+      if (timeline) timeline.value = targetStep;
+    } else {
+      this.currentStep = targetStep;
+      this.applyStep(targetStep);
+      
+      const timeline = document.getElementById('vis-timeline');
+      if (timeline) timeline.value = targetStep;
+    }
   }
 
   applyStep(stepIndex) {
@@ -819,6 +928,18 @@ class Visualizer {
     if (stepCount) stepCount.textContent = Math.max(0, this.currentStep + 1);
     if (comparisons) comparisons.textContent = this.comparisons;
     if (swapsEl) swapsEl.textContent = this.swapsCount;
+
+    // Update memory stats
+    const memVal = document.getElementById('vis-memory-val');
+    if (memVal) {
+      if (this.algorithm === 'merge') {
+        memVal.textContent = `O(N) - Aux Array: ${this.sampleSize}`;
+      } else if (this.algorithm === 'quick') {
+        memVal.textContent = `O(log N) - Call Stack: ${this.activeDepth}`;
+      } else {
+        memVal.textContent = `O(1) - Rỗng`;
+      }
+    }
   }
 
   updateAlgoInfo() {
@@ -1326,6 +1447,30 @@ class Visualizer {
             <span class="lt-progress-pct">${sortedPct}%</span>
           </div>
         `;
+      }
+    }
+  }
+
+  checkStability() {
+    if (this.dataType !== 'stability-test') return;
+
+    let isStable = true;
+    for (let i = 1; i < this.currentValues.length; i++) {
+      const prev = this.currentValues[i - 1];
+      const curr = this.currentValues[i];
+      if (Number(prev) === Number(curr)) {
+        if (prev._originalIndex > curr._originalIndex) {
+          isStable = false;
+          break;
+        }
+      }
+    }
+
+    if (window.app) {
+      if (isStable) {
+        window.app.showToast(`Thuật toán ${this.algorithm} là STABLE (Giữ nguyên được thứ tự các phần tử bằng nhau)`, 'success');
+      } else {
+        window.app.showToast(`Thuật toán ${this.algorithm} là UNSTABLE (Làm xáo trộn thứ tự các phần tử bằng nhau)`, 'error');
       }
     }
   }

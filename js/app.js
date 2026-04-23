@@ -7,6 +7,7 @@ class App {
     this.dataTable = null;
     this.visualizer = null;
     this.benchmark = null;
+    this.race = null;
     this.currentTab = 'data-table';
     this.toastContainer = null;
   }
@@ -31,6 +32,12 @@ class App {
     // Init Benchmark
     this.benchmark = new Benchmark('tab-benchmark');
     this.benchmark.init(this.dataTable.getData());
+
+    // Init Race Mode
+    if (typeof Race !== 'undefined') {
+      this.race = new Race('tab-race');
+      this.race.init(this.dataTable.getData());
+    }
 
     // Show default tab
     this.switchTab('data-table');
@@ -68,6 +75,11 @@ class App {
     if (tabId !== 'visualizer' && this.visualizer) {
       this.visualizer.pause();
     }
+    
+    // Pause race when switching away
+    if (tabId !== 'race' && this.race) {
+      this.race.pause();
+    }
   }
 
   setupKeyboardShortcuts() {
@@ -84,6 +96,9 @@ class App {
           break;
         case '3':
           this.switchTab('benchmark');
+          break;
+        case '4':
+          this.switchTab('race');
           break;
         case ' ':
           if (this.currentTab === 'visualizer') {
