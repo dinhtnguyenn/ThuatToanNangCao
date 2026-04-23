@@ -65,9 +65,17 @@ class Benchmark {
           </div>
         </div>
 
-        <button class="btn btn-primary btn-lg" id="bench-run-btn">
-          <span><i class="fa-solid fa-rocket"></i></span> Chạy Benchmark
-        </button>
+        <div style="display: flex; gap: var(--space-md); align-items: flex-end;">
+          <button class="btn btn-primary btn-lg" id="bench-run-btn">
+            <span><i class="fa-solid fa-rocket"></i></span> Chạy Benchmark
+          </button>
+          <button class="btn" id="bench-growth-btn" style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); font-weight: 600;">
+            <span><i class="fa-solid fa-chart-line"></i></span> Growth Curve
+          </button>
+          <button class="btn" id="bench-export-btn" style="background: var(--accent-green); border: none; color: white; display: none;">
+            <span><i class="fa-solid fa-file-csv"></i></span> Xuất CSV
+          </button>
+        </div>
       </div>
 
       <!-- Progress -->
@@ -132,12 +140,22 @@ class Benchmark {
           </div>
         </div>
 
-        <!-- Summary Card -->
+      <!-- Summary Card -->
         <div class="card" style="margin-top: var(--space-lg);">
           <div class="card-header">
             <div class="card-title"><i class="fa-solid fa-lightbulb"></i> Nhận xét</div>
           </div>
           <div id="bench-summary" style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.8;"></div>
+        </div>
+
+        <!-- Growth Curve Chart Container -->
+        <div class="card" id="bench-growth-card" style="display: none; margin-top: var(--space-lg);">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-chart-line"></i> Phân tích đường cong sinh trưởng (Growth Curve)</div>
+          </div>
+          <div style="padding: var(--space-lg); background: white; border-radius: 0 0 var(--radius-lg) var(--radius-lg);">
+            <canvas id="growth-chart" width="800" height="400"></canvas>
+          </div>
         </div>
       </div>
     `;
@@ -170,6 +188,12 @@ class Benchmark {
 
     // Run
     document.getElementById('bench-run-btn')?.addEventListener('click', () => this.runBenchmark());
+    
+    // Growth Curve
+    document.getElementById('bench-growth-btn')?.addEventListener('click', () => this.runGrowthCurveAnalysis());
+    
+    // Export CSV
+    document.getElementById('bench-export-btn')?.addEventListener('click', () => this.exportToCSV());
   }
 
   prepareData() {
@@ -274,8 +298,6 @@ class Benchmark {
         space: info.space,
         skipped: skipped
       });
-
-      if (progressBar) progressBar.style.width = `${((algoIdx + 1) / algorithms.length) * 100}%`;
     }
 
     // Sort results by time
@@ -288,6 +310,9 @@ class Benchmark {
 
     if (progress) progress.classList.remove('active');
     if (resultsContainer) resultsContainer.style.display = 'block';
+    
+    const exportBtn = document.getElementById('bench-export-btn');
+    if (exportBtn) exportBtn.style.display = 'inline-block';
 
     this.renderResults(data);
 
@@ -468,6 +493,155 @@ class Benchmark {
       ${this.dataType === 'nearly' ? '<p style="margin-top: 0.5rem;"><i class="fa-solid fa-thumbtack"></i> Với dữ liệu gần sắp xếp, <strong>Insertion Sort</strong> thường hoạt động rất hiệu quả do đặc tính O(n) trong best case.</p>' : ''}
       ${this.dataType === 'reversed' ? '<p style="margin-top: 0.5rem;"><i class="fa-solid fa-thumbtack"></i> Với dữ liệu đảo ngược, <strong>Bubble Sort</strong> và <strong>Insertion Sort</strong> thường hoạt động kém nhất do phải thực hiện nhiều hoán đổi.</p>' : ''}
     `;
+  }
+
+  async runGrowthCurveAnalysis() {
+    if (this.isRunning) return;
+    this.isRunning = true;
+
+    const btn = document.getElementById('bench-growth-btn');
+    if (btn) btn.innerHTML = '<span><i class="fa-solid fa-spinner fa-spin"></i></span> Đang tính...';
+
+    const growthCard = document.getElementById('bench-growth-card');
+    if (growthCard) growthCard.style.display = 'block';
+
+    // Disable running normal benchmark
+    const runBtn = document.getElementById('bench-run-btn');
+    if (runBtn) runBtn.disabled = true;
+
+    // We skip O(N^2) beyond 10,000 to prevent browser lockup.
+    const ns = [5000, 10000, 20000, 30000, 50000];
+    const algorithms = SortingAlgorithms.getAllNames();
+    const chartData = {};
+    algorithms.forEach(algo => chartData[algo] = []);
+
+    for (let i = 0; i < ns.length; i++) {
+      const n = ns[i];
+      // Generate dataset
+      const shuffled = [...this.allData].sort(() => Math.random() - 0.5);
+      const sample = shuffled.slice(0, n);
+      let values = sample.map(item => Number(item[this.sortField]));
+
+      switch (this.dataType) {
+        case 'nearly':
+          values.sort((a, b) => this.sortOrder === 'asc' ? a - b : b - a);
+          const numSwaps = Math.max(1, Math.floor(values.length * 0.05));
+          for (let s = 0; s < numSwaps; s++) {
+            const a = Math.floor(Math.random() * values.length);
+            const b = Math.floor(Math.random() * values.length);
+            [values[a], values[b]] = [values[b], values[a]];
+          }
+          break;
+        case 'reversed':
+          values.sort((a, b) => this.sortOrder === 'asc' ? b - a : a - b);
+          break;
+        case 'few':
+          const uniques = [...new Set(values)].slice(0, 5);
+          values = values.map(() => uniques[Math.floor(Math.random() * uniques.length)]);
+          break;
+      }
+
+      for (let algo of algorithms) {
+        if (n > 10000 && (algo === 'selection' || algo === 'insertion' || algo === 'bubble')) {
+          chartData[algo].push(null);
+        } else {
+          // Allow UI paint
+          await new Promise(r => setTimeout(r, 10));
+          const res = SortingAlgorithms.benchmark(algo, values, this.sortOrder);
+          chartData[algo].push(res.timeMs);
+        }
+      }
+    }
+
+    this.renderGrowthChart(ns, chartData);
+
+    if (btn) btn.innerHTML = '<span><i class="fa-solid fa-chart-line"></i></span> Growth Curve';
+    if (runBtn) runBtn.disabled = false;
+    this.isRunning = false;
+  }
+
+  renderGrowthChart(labels, dataMap) {
+    const ctx = document.getElementById('growth-chart');
+    if (!ctx) return;
+    
+    // Destroy previous instance to prevent overlapping hover glitches
+    if (this.growthChartInstance) {
+      this.growthChartInstance.destroy();
+    }
+
+    const algorithms = SortingAlgorithms.getAllNames();
+    // Using the theme colors
+    const colors = {
+      'selection': '#f472b6',
+      'insertion': '#a78bfa',
+      'bubble': '#fb923c',
+      'merge': '#22d3ee',
+      'quick': '#34d399'
+    };
+
+    const datasets = algorithms.map(algo => {
+      const info = SortingAlgorithms.getInfo(algo);
+      return {
+        label: info.name,
+        data: dataMap[algo],
+        borderColor: colors[algo],
+        backgroundColor: colors[algo],
+        tension: 0.4,
+        spanGaps: true // Continues the line if there's a null value
+      };
+    });
+
+    this.growthChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: datasets
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: { mode: 'index', intersect: false }
+        },
+        scales: {
+          x: { title: { display: true, text: 'Số phần tử (N)' } },
+          y: { title: { display: true, text: 'Thời gian (ms)' } }
+        }
+      }
+    });
+    
+    // Auto scroll to chart
+    document.getElementById('bench-growth-card')?.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  exportToCSV() {
+    if (!this.results || this.results.length === 0) {
+      if (window.app) window.app.showToast('Vui lòng chạy benchmark trước khi xuất báo cáo', 'warning');
+      return;
+    }
+    
+    // Excel requires BOM to parse UTF-8 correctly
+    let csv = '\uFEFF'; 
+    csv += 'Thuat Toan,Thoi Gian (ms),So Phep So Sanh,So Phep Hoan Doi\n';
+    
+    this.results.forEach(r => {
+      if (!r.skipped) {
+        csv += `${r.name},${r.timeMs.toFixed(3)},${r.comparisons},${r.swaps}\n`;
+      } else {
+        csv += `${r.name},Bo qua (N qua lon),-,-\n`;
+      }
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `sortviz_benchmark_${this.sampleSize}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    if (window.app) window.app.showToast('Đã xuất báo cáo CSV thành công', 'success');
   }
 }
 

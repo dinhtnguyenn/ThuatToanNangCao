@@ -20,6 +20,7 @@ class Visualizer {
     this.sortedIndices = new Set();
     this.comparisons = 0;
     this.swapsCount = 0;
+    this.dataType = 'random';
     this.result = null;
 
     // Divide & Conquer tracking
@@ -85,6 +86,16 @@ class Visualizer {
             <option value="10000">10000 (Rất lag)</option>
             <option value="50000">50000 (Treo máy)</option>
             <option value="100000">100000 (Treo máy)</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label>Phân bố (Data):</label>
+          <select id="vis-data-type-select">
+            <option value="random">Ngẫu nhiên</option>
+            <option value="nearly">Gần sắp xếp</option>
+            <option value="reversed">Đảo ngược</option>
+            <option value="few">Ít giá trị</option>
           </select>
         </div>
 
@@ -268,12 +279,20 @@ class Visualizer {
     });
 
     // Generate
-    document.getElementById('vis-generate-btn')?.addEventListener('click', () => {
+    // Data type
+    document.getElementById('vis-data-type-select')?.addEventListener('change', (e) => {
+      this.dataType = e.target.value;
       this.generateSample();
-      if (window.app) window.app.showToast('Đã tạo dữ liệu mới!', 'info');
     });
 
-    // Controls
+    document.getElementById('vis-generate-btn')?.addEventListener('click', () => {
+      this.generateSample();
+      if (window.app) {
+        const typeNames = { random: 'Ngẫu nhiên', nearly: 'Gần sắp xếp', reversed: 'Đảo ngược', few: 'Ít giá trị' };
+        window.app.showToast(`Đã tạo dữ liệu mới: ${this.sampleSize} phần tử (${typeNames[this.dataType] || 'Mặc định'})`, 'info');
+      }
+    });
+
     document.getElementById('vis-play-btn')?.addEventListener('click', () => this.togglePlay());
     document.getElementById('vis-next-btn')?.addEventListener('click', () => this.stepForward());
     document.getElementById('vis-prev-btn')?.addEventListener('click', () => this.stepBackward());
@@ -305,10 +324,10 @@ class Visualizer {
     this.activeDepth = 0;
     this.activeMidPoint = null;
 
-    // Random sample from allData
+    // Generate sample based on data type
     const shuffled = [...this.allData].sort(() => Math.random() - 0.5);
-    this.data = shuffled.slice(0, this.sampleSize);
-    this.originalData = this.data.map(d => d[this.sortField]);
+    const sample = shuffled.slice(0, this.sampleSize);
+    this.originalData = sample.map(d => d[this.sortField]);
     this.currentValues = [...this.originalData];
 
     // Ensure all values are numeric and auto-format as currency for algorithm descriptions
@@ -323,8 +342,28 @@ class Visualizer {
       return obj;
     };
 
-    this.currentValues = this.currentValues.map(wrapValue);
-    this.originalData = this.originalData.map(wrapValue);
+    let values = this.originalData.map(Number);
+    switch (this.dataType) {
+      case 'nearly':
+        values.sort((a, b) => this.sortOrder === 'asc' ? a - b : b - a);
+        const numSwaps = Math.max(1, Math.floor(values.length * 0.05));
+        for (let s = 0; s < numSwaps; s++) {
+          const a = Math.floor(Math.random() * values.length);
+          const b = Math.floor(Math.random() * values.length);
+          [values[a], values[b]] = [values[b], values[a]];
+        }
+        break;
+      case 'reversed':
+        values.sort((a, b) => this.sortOrder === 'asc' ? b - a : a - b);
+        break;
+      case 'few':
+        const uniques = [...new Set(values)].slice(0, 5);
+        values = values.map(() => uniques[Math.floor(Math.random() * uniques.length)]);
+        break;
+    }
+
+    this.currentValues = values.map(wrapValue);
+    this.originalData = values.map(wrapValue);
 
     // Run algorithm to get steps
     this.result = SortingAlgorithms.run(this.algorithm, this.currentValues, this.sortOrder);
