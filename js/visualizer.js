@@ -311,9 +311,20 @@ class Visualizer {
     this.originalData = this.data.map(d => d[this.sortField]);
     this.currentValues = [...this.originalData];
 
-    // Ensure all values are numeric
-    this.currentValues = this.currentValues.map(Number);
-    this.originalData = this.originalData.map(Number);
+    // Ensure all values are numeric and auto-format as currency for algorithm descriptions
+    const isPrice = this.sortField === 'price';
+    const wrapValue = (v) => {
+      const num = Number(v);
+      const obj = new Number(num);
+      obj.toString = function() {
+        if (isPrice) return this.valueOf().toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+        return this.valueOf() % 1 === 0 ? this.valueOf().toString() : this.valueOf().toFixed(1);
+      };
+      return obj;
+    };
+
+    this.currentValues = this.currentValues.map(wrapValue);
+    this.originalData = this.originalData.map(wrapValue);
 
     // Run algorithm to get steps
     this.result = SortingAlgorithms.run(this.algorithm, this.currentValues, this.sortOrder);
