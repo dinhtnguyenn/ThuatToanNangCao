@@ -339,13 +339,17 @@ class Race {
     container.innerHTML = runner.values.map((val, i) => {
       const height = Math.max((val / maxVal) * 100, 2);
       let bgColor = baseColor;
+      let boxShadow = 'none';
 
       if (runner.isDone) {
         bgColor = '#10b981'; // Green when done
+        boxShadow = '0 0 8px rgba(16, 185, 129, 0.4)';
       } else if (runner.highlights?.comparing?.includes(i)) {
         bgColor = '#fbbf24'; // Yellow
+        boxShadow = '0 0 10px rgba(245, 158, 11, 0.6)';
       } else if (runner.highlights?.swapping?.includes(i)) {
         bgColor = '#ef4444'; // Red
+        boxShadow = '0 0 10px rgba(239, 68, 68, 0.6)';
       }
 
       // Tooltip content
@@ -365,7 +369,7 @@ class Race {
         tooltipContent = `<div class="tooltip-row"><span class="tooltip-label">Giá trị:</span><span class="tooltip-value">${val}</span></div>`;
       }
 
-      return `<div style="flex: 1; height: ${height}%; background: ${bgColor}; border-radius: 2px 2px 0 0; transition: background-color 0.1s; cursor: help;" data-tooltip='${tooltipContent.replace(/'/g, "&apos;")}'></div>`;
+      return `<div style="flex: 1; height: ${height}%; background: ${bgColor}; border-radius: 2px 2px 0 0; transition: background-color 0.1s, box-shadow 0.1s; cursor: help; box-shadow: ${boxShadow};" data-tooltip='${tooltipContent.replace(/'/g, "&apos;")}'></div>`;
     }).join('');
 
     // Update progress

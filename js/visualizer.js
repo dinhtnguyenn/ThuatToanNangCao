@@ -656,115 +656,69 @@ class Visualizer {
 
     const maxVal = Math.max(...this.currentValues, 1);
     const n = this.currentValues.length;
-    const fieldConfig = DatasetManager.getDataset(this.datasetId).fields.find(f => f.id === this.sortField);
+    const config = DatasetManager.getDataset(this.datasetId);
+    const fieldConfig = config.fields.find(f => f.id === this.sortField);
     const isString = fieldConfig && fieldConfig.type === 'string';
-    const isPrice = this.sortField === 'price';
     
-    // Tự động điều chỉnh khoảng cách và kích thước thanh để chống tràn (bể giao diện)
     chart.style.gap = n > 200 ? '0px' : (n > 50 ? '1px' : '2px');
     const minWidth = n > 100 ? '0' : '4px';
 
     chart.innerHTML = this.currentValues.map((val, i) => {
       const height = (val / maxVal) * 100;
-      let cls = 'bar';
+      let barClasses = ['bar'];
+      let inlineStyle = `height: ${Math.max(height, 2)}%; min-width: ${minWidth};`;
 
-      // Determine if this bar is in the active range
-      const inRange = this.activeRange
-        ? (i >= this.activeRange[0] && i <= this.activeRange[1])
-        : true;
+      // Highlights
+      if (this.sortedIndices.has(i)) barClasses.push('sorted');
+      if (highlightIndices.comparing?.includes(i)) barClasses.push('comparing');
+      if (highlightIndices.swapping?.includes(i)) barClasses.push('swapping');
+      if (highlightIndices.pivot?.includes(i)) barClasses.push('pivot');
+      if (highlightIndices.merge?.includes(i)) barClasses.push('merge-highlight');
+      if (highlightIndices.baseCase?.includes(i)) barClasses.push('base-case');
+      if (highlightIndices.currentMin?.includes(i)) barClasses.push('current-min');
+      if (highlightIndices.outerIdx?.includes(i)) barClasses.push('outer-index');
 
-      if (this.sortedIndices.has(i)) cls += ' sorted';
-      if (highlightIndices.comparing?.includes(i)) cls += ' comparing';
-      if (highlightIndices.swapping?.includes(i)) cls += ' swapping';
-      if (highlightIndices.pivot?.includes(i)) cls += ' pivot';
-      if (highlightIndices.merge?.includes(i)) cls += ' merge-highlight';
-      if (highlightIndices.baseCase?.includes(i)) cls += ' base-case';
-      if (highlightIndices.divideLeft?.includes(i)) cls += ' divide-left';
-      if (highlightIndices.divideRight?.includes(i)) cls += ' divide-right';
-      if (highlightIndices.keep?.includes(i)) cls += ' keep-position';
-      if (highlightIndices.currentMin?.includes(i)) cls += ' current-min';
-      if (highlightIndices.scanPos?.includes(i)) cls += ' scan-position';
-      if (highlightIndices.outerIdx?.includes(i)) cls += ' outer-index';
-
-      // Dim bars outside active range for D&C algorithms
-      if (this.isDivideConquer && this.activeRange && !inRange && !this.sortedIndices.has(i)) {
-        cls += ' dimmed';
+      if (this.isDivideConquer && this.activeRange) {
+        const inRange = i >= this.activeRange[0] && i <= this.activeRange[1];
+        if (!inRange && !this.sortedIndices.has(i)) barClasses.push('dimmed');
+        if (i === this.activeMidPoint) barClasses.push('midpoint');
       }
 
-      // If bar is at the midpoint, add midpoint class
-      if (this.activeMidPoint !== null && i === this.activeMidPoint && this.activeRange) {
-        cls += ' midpoint';
-      }
-
-      let displayVal = typeof val === 'number' ? (val % 1 === 0 ? val : val.toFixed(1)) : val;
-      if (this.sortField === 'price' && typeof val === 'number') {
-        // Format tiền VNĐ chuẩn với ký hiệu VND
-        displayVal = val.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
-      }
-
-      // Custom style for Stability Test or String Sorting
-      let customStyle = '';
-      let extraLabelHtml = '';
-      
+      // Colors
       if (this.dataType === 'stability-test' && val._originalIndex !== undefined) {
-        customStyle = `background: hsl(${val._colorHue || 0}, 70%, 50%) !important;`;
-        extraLabelHtml = `<div style="position: absolute; bottom: 5px; width: 100%; text-align: center; color: white; font-weight: bold; font-size: 10px; text-shadow: 0 1px 2px black;">#${val._originalIndex}</div>`;
-      } else if (isString && val.label) {
-        const charCode = val.label.charCodeAt(0) || 0;
-        const hue = (charCode * 137.5) % 360;
-        customStyle = `background: hsl(${hue}, 60%, 45%) !important;`;
-        
-        // Dynamic labels based on high-precision dimension calculations
-        const chartRect = chart.getBoundingClientRect();
-        const chartW = chartRect.width || chart.clientWidth || 800;
-        const chartH = chartRect.height || chart.clientHeight || 400;
-        
+        inlineStyle += ` background: hsl(${val._colorHue || 0}, 70%, 50%);`;
+      } else {
+        // Force the same background for all other data types
+        inlineStyle += ` background: var(--accent-blue);`;
+      }
+
+      // Labels
+      let labelHtml = '';
+      if (isString && val.label) {
+        const chartW = chart.clientWidth || 800;
         const barWidth = chartW / n;
-        const actualBarHeightPx = (height / 100) * chartH;
-        
-        const fontSize = Math.max(8, Math.min(11, barWidth * 0.7));
-        const maxWidth = n > 12 ? '150px' : (barWidth - 2) + 'px';
-        
-        // Strictly hide label if bar is too short (under 50% height) or too narrow (under 20px)
         if (barWidth > 20 && height >= 50) {
-          extraLabelHtml = `<div class="bar-text-label" style="
-            font-size: ${fontSize}px;
-            max-width: ${maxWidth};
-          ">${val.label}</div>`;
-        } else {
-          extraLabelHtml = '';
+          const fontSize = Math.max(8, Math.min(11, barWidth * 0.7));
+          labelHtml = `<div class="bar-text-label" style="font-size: ${fontSize}px; max-width: ${n > 12 ? '150px' : (barWidth - 2) + 'px'};">${val.label}</div>`;
         }
       }
 
-      // Prepare Tooltip Data
-      const dataset = DatasetManager.getDataset(this.datasetId);
-      let tooltipContent = `<div class="tooltip-title">${val.label || 'Phần tử'}</div>`;
-      if (val.item) {
-        dataset.fields.forEach(f => {
+      const tooltipContent = `<div class="tooltip-title">${val.label || 'Phần tử'}</div>` + 
+        (val.item ? config.fields.map(f => {
           let fVal = val.item[f.id];
           if (f.type === 'number' && f.id === 'price') fVal = fVal.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
-          tooltipContent += `
-            <div class="tooltip-row">
-              <span class="tooltip-label">${f.label}:</span>
-              <span class="tooltip-value">${fVal}</span>
-            </div>
-          `;
-        });
-      }
+          return `<div class="tooltip-row"><span class="tooltip-label">${f.label}:</span><span class="tooltip-value">${fVal}</span></div>`;
+        }).join('') : '');
 
-      // Only show labels/badges if bar is wide enough
-      const barWidth = chart.clientWidth / n;
-      const showLabels = barWidth > 35;
-      const showSmallLabels = barWidth > 15;
-
-      return `<div class="${cls}" style="height: ${Math.max(height, 2)}%; min-width: ${minWidth}; ${customStyle}" 
-                   data-index="${i}" id="bar-${i}" data-tooltip='${tooltipContent.replace(/'/g, "&apos;")}'>
-        <span class="bar-value">${isString ? '' : displayVal}</span>
-        ${extraLabelHtml}
-        ${highlightIndices.comparing?.includes(i) ? '<div class="bar-pointer">▼</div>' : ''}
-        ${highlightIndices.currentMin?.includes(i) ? '<div class="bar-min-badge">MIN</div>' : ''}
-        ${highlightIndices.outerIdx?.includes(i) ? '<div class="bar-i-badge">i=' + i + '</div>' : ''}
-      </div>`;
+      return `
+        <div class="${barClasses.join(' ')}" style="${inlineStyle}" data-index="${i}" id="bar-${i}" data-tooltip='${tooltipContent.replace(/'/g, "&apos;")}'>
+          <span class="bar-value">${isString ? '' : val.toString()}</span>
+          ${labelHtml}
+          ${highlightIndices.comparing?.includes(i) ? '<div class="bar-pointer">▼</div>' : ''}
+          ${highlightIndices.currentMin?.includes(i) ? '<div class="bar-min-badge">MIN</div>' : ''}
+          ${highlightIndices.outerIdx?.includes(i) ? '<div class="bar-i-badge">i=' + i + '</div>' : ''}
+        </div>
+      `;
     }).join('');
   }
 
