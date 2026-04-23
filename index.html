@@ -40,24 +40,28 @@
         <span>SortViz</span>
       </div>
 
-      <ul class="nav-tabs" id="nav-tabs">
-        <li class="nav-tab active" data-tab="data-table">
-          <span class="tab-icon"><i class="fa-solid fa-table"></i></span>
-          <span>Data Table</span>
-        </li>
-        <li class="nav-tab" data-tab="visualizer">
-          <span class="tab-icon"><i class="fa-solid fa-microscope"></i></span>
-          <span>Visualizer</span>
-        </li>
-        <li class="nav-tab" data-tab="benchmark">
-          <span class="tab-icon"><i class="fa-solid fa-bolt"></i></span>
-          <span>Benchmark</span>
-        </li>
-        <li class="nav-tab" data-tab="race">
+      <nav class="nav-tabs">
+        <div class="nav-tab active" data-tab="data-table">
+          <span class="tab-icon"><i class="fa-solid fa-database"></i></span>
+          <span>Dữ liệu Sản phẩm</span>
+        </div>
+        <div class="nav-tab" data-tab="visualizer">
+          <span class="tab-icon"><i class="fa-solid fa-chart-simple"></i></span>
+          <span>Trực quan hóa</span>
+        </div>
+        <div class="nav-tab" data-tab="race">
           <span class="tab-icon"><i class="fa-solid fa-flag-checkered"></i></span>
           <span>Đua Thuật Toán</span>
-        </li>
-      </ul>
+        </div>
+        <div class="nav-tab" data-tab="benchmark">
+          <span class="tab-icon"><i class="fa-solid fa-gauge-high"></i></span>
+          <span>Đánh giá Hiệu năng</span>
+        </div>
+        <div class="nav-tab" data-tab="guide">
+          <span class="tab-icon"><i class="fa-solid fa-circle-question"></i></span>
+          <span>Hướng dẫn</span>
+        </div>
+      </nav>
 
       <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
         <span><i class="fa-solid fa-keyboard"></i></span> 1/2/3 chuyển tab • Space play • ← → bước
@@ -124,7 +128,7 @@
     </section>
 
     <!-- ===== TAB: BENCHMARK ===== -->
-    <section class="tab-content" id="tab-benchmark">
+    <section id="tab-benchmark" class="tab-content">
       <div class="section-header">
         <div class="section-title">
           <span class="icon"><i class="fa-solid fa-bolt"></i></span>
@@ -149,6 +153,82 @@
         </div>
       </div>
       <!-- Content injected by Race module -->
+    </section>
+
+    <!-- GUIDE TAB -->
+    <section id="tab-guide" class="tab-content">
+      <div class="guide-container">
+        <div class="guide-header">
+          <h1 class="guide-title">Chào mừng bạn đến với Sorting Visualizer Pro</h1>
+          <p class="guide-subtitle">Công cụ nghiên cứu và trực quan hóa thuật toán sắp xếp chuyên sâu bậc nhất.</p>
+        </div>
+
+        <div class="guide-grid">
+          <!-- Feature 1: Data Table -->
+          <div class="guide-card">
+            <div class="guide-card-content">
+              <h3><i class="fa-solid fa-database text-accent"></i> 1. Quản lý Dữ liệu Thực tế</h3>
+              <p>Khám phá cách các thuật toán xử lý dữ liệu từ thế giới thực. Bạn có thể tìm kiếm, lọc và xem chi tiết thông tin sản phẩm trước khi đưa vào sắp xếp.</p>
+              <ul>
+                <li>Tìm kiếm sản phẩm theo tên.</li>
+                <li>Sắp xếp nhanh theo Giá, Đánh giá hoặc Tồn kho.</li>
+                <li>Xem tổng quan thị trường qua các bảng thống kê.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Feature 2: Visualizer -->
+          <div class="guide-card wide">
+            <div class="guide-image">
+              <img src="img/visualizer_guide_illustration_1776923704160.png" alt="Visualizer Illustration">
+            </div>
+            <div class="guide-card-content">
+              <h3><i class="fa-solid fa-chart-simple text-cyan" style="color: var(--accent-cyan);"></i> 2. Trực quan hóa Chuyên sâu</h3>
+              <p>Đây là trái tim của ứng dụng, nơi bạn chứng kiến từng bước di chuyển của thuật toán.</p>
+              <ul>
+                <li><strong>Timeline Scrubber:</strong> Tua ngược hoặc tiến tới bất kỳ bước nào trong quá trình sắp xếp.</li>
+                <li><strong>Phân tích Thông minh:</strong> Nhận lời khuyên về thuật toán tối ưu dựa trên phân bổ dữ liệu.</li>
+                <li><strong>Bản đồ nhiệt (Heatmap):</strong> Theo dõi các "điểm nóng" - những phần tử bị truy cập nhiều nhất.</li>
+                <li><strong>So sánh Chi phí:</strong> Xem dự báo tổng số bước của các thuật toán khác trên cùng một mảng.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Feature 3: Race -->
+          <div class="guide-card wide reversed">
+            <div class="guide-image">
+              <img src="img/race_mode_guide_illustration_1776923731973.png" alt="Race Illustration">
+            </div>
+            <div class="guide-card-content">
+              <h3><i class="fa-solid fa-flag-checkered text-yellow" style="color: var(--accent-yellow);"></i> 3. Cuộc đua Thuật toán (Race Mode)</h3>
+              <p>Cho phép 5 thuật toán cùng lúc so tài trên một tập dữ liệu ngẫu nhiên.</p>
+              <ul>
+                <li><strong>Leaderboard:</strong> Bảng xếp hạng cập nhật thời gian thực về Hạng, Số bước và Thời gian.</li>
+                <li><strong>Đồng hồ bấm giờ:</strong> Đo thành tích chạy thực tế (Visual time) của từng thuật toán.</li>
+                <li><strong>Đặc điểm lý thuyết:</strong> Hiển thị song song các thông số Độ phức tạp và Tính ổn định.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Feature 4: Benchmark -->
+          <div class="guide-card">
+            <div class="guide-card-content">
+              <h3><i class="fa-solid fa-gauge-high text-green" style="color: var(--accent-green);"></i> 4. Đánh giá Hiệu năng (Benchmark)</h3>
+              <p>Phân tích thống kê trên các tập dữ liệu lớn để tìm ra thuật toán mạnh mẽ nhất.</p>
+              <ul>
+                <li>Chạy thử nghiệm trên nhiều kịch bản (Ngẫu nhiên, Ngược, Đã sắp xếp).</li>
+                <li>Biểu đồ đường biểu diễn sự thay đổi hiệu năng theo kích thước mảng.</li>
+                <li>Báo cáo chi tiết về thời gian xử lý (ms) của hệ thống.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-footer">
+          <p>Sẵn sàng để bắt đầu? Hãy chọn một tab ở phía trên và khám phá ngay!</p>
+          <button class="btn btn-primary" onclick="app.switchTab('visualizer')">Bắt đầu Trực quan hóa</button>
+        </div>
+      </div>
     </section>
 
   </main>

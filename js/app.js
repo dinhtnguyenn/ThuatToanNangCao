@@ -95,10 +95,13 @@ class App {
           this.switchTab('visualizer');
           break;
         case '3':
-          this.switchTab('benchmark');
+          this.switchTab('race');
           break;
         case '4':
-          this.switchTab('race');
+          this.switchTab('benchmark');
+          break;
+        case '5':
+          this.switchTab('guide');
           break;
         case ' ':
           if (this.currentTab === 'visualizer') {
