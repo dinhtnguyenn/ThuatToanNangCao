@@ -255,6 +255,10 @@ class Visualizer {
           </div>
 
           <!-- Recursion Tree (only for merge/quick) -->
+          <div class="card" id="recursion-tree-card" style="display: none;">
+            <div class="card-header">
+              <div class="card-title"><i class="fa-solid fa-sitemap"></i> Đệ quy hiện tại</div>
+            </div>
             <div id="recursion-tree" style="font-size: 0.82rem; font-family: var(--font-mono); color: var(--text-secondary); line-height: 1.7;"></div>
           </div>
 

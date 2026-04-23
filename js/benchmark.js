@@ -65,14 +65,14 @@ class Benchmark {
           </div>
         </div>
 
-        <div style="display: flex; gap: var(--space-md); align-items: flex-end;">
+        <div class="benchmark-actions">
           <button class="btn btn-primary btn-lg" id="bench-run-btn">
             <span><i class="fa-solid fa-rocket"></i></span> Chạy Benchmark
           </button>
-          <button class="btn" id="bench-growth-btn" style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); font-weight: 600;">
+          <button class="btn btn-secondary" id="bench-growth-btn">
             <span><i class="fa-solid fa-chart-line"></i></span> Growth Curve
           </button>
-          <button class="btn" id="bench-export-btn" style="background: var(--accent-green); border: none; color: white; display: none;">
+          <button class="btn btn-success" id="bench-export-btn" style="display: none;">
             <span><i class="fa-solid fa-file-csv"></i></span> Xuất CSV
           </button>
         </div>
@@ -153,8 +153,8 @@ class Benchmark {
           <div class="card-header">
             <div class="card-title"><i class="fa-solid fa-chart-line"></i> Phân tích đường cong sinh trưởng (Growth Curve)</div>
           </div>
-          <div style="padding: var(--space-lg); background: white; border-radius: 0 0 var(--radius-lg) var(--radius-lg);">
-            <canvas id="growth-chart" width="800" height="400"></canvas>
+          <div class="growth-chart-wrapper">
+            <canvas id="growth-chart"></canvas>
           </div>
         </div>
       </div>
