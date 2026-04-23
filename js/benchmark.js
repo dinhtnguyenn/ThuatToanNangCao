@@ -13,10 +13,19 @@ class Benchmark {
     this.results = [];
     this.isRunning = false;
     this.datasetId = 'ecommerce';
+    this.sortField = null; // Will be set in init()
   }
 
   init(allData) {
     this.allData = allData;
+    
+    if (!this.sortField) {
+      const config = DatasetManager.getDataset(this.datasetId);
+      if (config && config.fields.length > 0) {
+        this.sortField = config.fields[0].id;
+      }
+    }
+
     this.render();
     this.bindEvents();
   }
@@ -156,6 +165,19 @@ class Benchmark {
             <canvas id="growth-chart"></canvas>
           </div>
         </div>
+
+        <!-- Detailed Sample Data -->
+        <div class="card" id="bench-sample-data-card" style="display: none; margin-top: var(--space-lg);">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-database"></i> Dữ liệu mẫu sử dụng (Tối đa 100 phần tử đầu tiên)</div>
+          </div>
+          <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+            <table class="data-table" id="bench-sample-data-table">
+              <thead id="bench-sample-data-thead"></thead>
+              <tbody id="bench-sample-data-tbody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -195,10 +217,34 @@ class Benchmark {
     document.getElementById('bench-export-btn')?.addEventListener('click', () => this.exportToCSV());
   }
 
-  prepareData() {
+  prepareData(size = this.sampleSize) {
     const shuffled = [...this.allData].sort(() => Math.random() - 0.5);
-    const sample = shuffled.slice(0, this.sampleSize);
-    let values = sample.map(item => Number(item[this.sortField]));
+    const sample = shuffled.slice(0, size);
+    
+    const fieldConfig = DatasetManager.getDataset(this.datasetId).fields.find(f => f.id === this.sortField);
+    const isString = fieldConfig && fieldConfig.type === 'string';
+    const isPrice = this.sortField === 'price';
+
+    const localWrapValue = (v, item) => {
+      const num = Number(v);
+      const obj = new Number(num);
+      obj.item = item;
+      obj.label = item ? item[this.sortField] : v;
+      obj.toString = function() {
+        if (this.label && isString) return this.label;
+        if (isPrice) return this.valueOf().toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+        return this.valueOf() % 1 === 0 ? this.valueOf().toString() : this.valueOf().toFixed(1);
+      };
+      return obj;
+    };
+
+    let values;
+    if (isString) {
+      const uniqueSorted = [...new Set(sample.map(d => d[this.sortField]))].sort((a, b) => String(a).localeCompare(String(b)));
+      values = sample.map(d => localWrapValue(uniqueSorted.indexOf(d[this.sortField]) + 1, d));
+    } else {
+      values = sample.map(item => localWrapValue(Number(item[this.sortField]), item));
+    }
 
     switch (this.dataType) {
       case 'nearly': {
@@ -332,12 +378,64 @@ class Benchmark {
     this.renderTimeChart();
     this.renderComparisonCharts();
     this.renderSummary(data);
+    this.renderSampleData(data);
 
     const dataInfo = document.getElementById('bench-data-info');
     const dataTypeNames = { random: 'Random', nearly: 'Gần sắp xếp', reversed: 'Đảo ngược', few: 'Ít giá trị' };
     if (dataInfo) {
-      dataInfo.textContent = `${this.sampleSize.toLocaleString()} items | ${dataTypeNames[this.dataType]} | ${this.sortField}`;
+      const config = DatasetManager.getDataset(this.datasetId);
+      const fieldConfig = config.fields.find(f => f.id === this.sortField);
+      const fieldLabel = fieldConfig ? fieldConfig.label : this.sortField;
+      dataInfo.textContent = `${config.name} | ${this.sampleSize.toLocaleString()} items | ${dataTypeNames[this.dataType]} | ${fieldLabel}`;
     }
+  }
+
+  renderSampleData(data) {
+    const card = document.getElementById('bench-sample-data-card');
+    const thead = document.getElementById('bench-sample-data-thead');
+    const tbody = document.getElementById('bench-sample-data-tbody');
+    
+    if (!card || !thead || !tbody) return;
+    
+    card.style.display = 'block';
+    
+    const config = DatasetManager.getDataset(this.datasetId);
+    
+    // Header
+    thead.innerHTML = `
+      <tr>
+        <th style="width: 50px">STT</th>
+        <th>Giá trị dùng để sắp xếp</th>
+        ${config.fields.map(f => `<th>${f.label}</th>`).join('')}
+      </tr>
+    `;
+    
+    // Body (max 100 items to prevent lag)
+    const displayData = data.slice(0, 100);
+    tbody.innerHTML = displayData.map((val, idx) => {
+      let itemHtml = '';
+      if (val.item) {
+        itemHtml = config.fields.map(f => {
+          let fVal = val.item[f.id];
+          if (f.type === 'number' && f.id === 'price') {
+            fVal = fVal.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+          }
+          return `<td>${fVal}</td>`;
+        }).join('');
+      } else {
+        itemHtml = `<td colspan="${config.fields.length}">Dữ liệu không có chi tiết</td>`;
+      }
+      
+      const sortVal = val.label ? val.label : val;
+      
+      return `
+        <tr>
+          <td>${idx + 1}</td>
+          <td style="font-weight: bold; color: var(--accent-cyan);">${sortVal}</td>
+          ${itemHtml}
+        </tr>
+      `;
+    }).join('');
   }
 
   renderTable() {
@@ -517,28 +615,7 @@ class Benchmark {
     for (let i = 0; i < ns.length; i++) {
       const n = ns[i];
       // Generate dataset
-      const shuffled = [...this.allData].sort(() => Math.random() - 0.5);
-      const sample = shuffled.slice(0, n);
-      let values = sample.map(item => Number(item[this.sortField]));
-
-      switch (this.dataType) {
-        case 'nearly':
-          values.sort((a, b) => this.sortOrder === 'asc' ? a - b : b - a);
-          const numSwaps = Math.max(1, Math.floor(values.length * 0.05));
-          for (let s = 0; s < numSwaps; s++) {
-            const a = Math.floor(Math.random() * values.length);
-            const b = Math.floor(Math.random() * values.length);
-            [values[a], values[b]] = [values[b], values[a]];
-          }
-          break;
-        case 'reversed':
-          values.sort((a, b) => this.sortOrder === 'asc' ? b - a : a - b);
-          break;
-        case 'few':
-          const uniques = [...new Set(values)].slice(0, 5);
-          values = values.map(() => uniques[Math.floor(Math.random() * uniques.length)]);
-          break;
-      }
+      const values = this.prepareData(n);
 
       for (let algo of algorithms) {
         if (n > 10000 && (algo === 'selection' || algo === 'insertion' || algo === 'bubble')) {
@@ -645,9 +722,11 @@ class Benchmark {
   updateFields(fields) {
     const selector = document.getElementById('bench-field-select');
     if (selector) {
-      const numericFields = fields.filter(f => f.type === 'number');
-      selector.innerHTML = numericFields.map(f => `<option value="${f.id}">${f.label}</option>`).join('');
-      this.sortField = numericFields.length > 0 ? numericFields[0].id : 'id';
+      selector.innerHTML = fields.map(f => `<option value="${f.id}">${f.label}</option>`).join('');
+      if (!this.sortField || !fields.find(f => f.id === this.sortField)) {
+        this.sortField = fields[0].id;
+      }
+      selector.value = this.sortField;
     }
   }
 }

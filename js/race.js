@@ -153,6 +153,36 @@ class Race {
       this.generateSample();
     });
 
+    // Tooltip logic
+    let tooltip = document.querySelector('.custom-tooltip');
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.className = 'custom-tooltip';
+      document.body.appendChild(tooltip);
+    }
+
+    const grid = document.getElementById('race-grid');
+    if (grid) {
+      grid.addEventListener('mousemove', (e) => {
+        const bar = e.target.closest('div[data-tooltip]');
+        if (bar) {
+          tooltip.innerHTML = bar.dataset.tooltip;
+          tooltip.style.display = 'block';
+          
+          const x = e.clientX + 15;
+          const y = e.clientY + 15;
+          const spaceX = window.innerWidth - x;
+          const spaceY = window.innerHeight - y;
+          
+          tooltip.style.left = (spaceX < 260 ? x - 270 : x) + 'px';
+          tooltip.style.top = (spaceY < 200 ? y - 150 : y) + 'px';
+        } else {
+          tooltip.style.display = 'none';
+        }
+      });
+      grid.addEventListener('mouseleave', () => tooltip.style.display = 'none');
+    }
+
     document.getElementById('race-play-btn')?.addEventListener('click', () => this.togglePlay());
     document.getElementById('race-reset-btn')?.addEventListener('click', () => this.resetRace());
 
@@ -176,13 +206,27 @@ class Race {
     
     const fieldConfig = DatasetManager.getDataset(this.datasetId).fields.find(f => f.id === this.sortField);
     const isString = fieldConfig && fieldConfig.type === 'string';
+    const isPrice = this.sortField === 'price';
+
+    const localWrapValue = (v, item) => {
+      const num = Number(v);
+      const obj = new Number(num);
+      obj.item = item;
+      obj.label = item ? item[this.sortField] : v;
+      obj.toString = function() {
+        if (this.label && isString) return this.label;
+        if (isPrice) return this.valueOf().toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+        return this.valueOf() % 1 === 0 ? this.valueOf().toString() : this.valueOf().toFixed(1);
+      };
+      return obj;
+    };
 
     let values;
     if (isString) {
       const uniqueSorted = [...new Set(sample.map(d => d[this.sortField]))].sort((a, b) => String(a).localeCompare(String(b)));
-      values = sample.map(d => uniqueSorted.indexOf(d[this.sortField]) + 1);
+      values = sample.map(d => localWrapValue(uniqueSorted.indexOf(d[this.sortField]) + 1, d));
     } else {
-      values = sample.map(item => Number(item[this.sortField]));
+      values = sample.map(item => localWrapValue(Number(item[this.sortField]), item));
     }
 
     switch (this.dataType) {
@@ -290,6 +334,7 @@ class Race {
     };
 
     const baseColor = algoColors[runner.id] || 'var(--accent-cyan)';
+    const dataset = DatasetManager.getDataset(this.datasetId);
 
     container.innerHTML = runner.values.map((val, i) => {
       const height = Math.max((val / maxVal) * 100, 2);
@@ -303,7 +348,24 @@ class Race {
         bgColor = '#ef4444'; // Red
       }
 
-      return `<div style="flex: 1; height: ${height}%; background: ${bgColor}; border-radius: 2px 2px 0 0; transition: background-color 0.1s;"></div>`;
+      // Tooltip content
+      let tooltipContent = `<div class="tooltip-title">${val.label || 'Phần tử'}</div>`;
+      if (val.item) {
+        dataset.fields.forEach(f => {
+          let fVal = val.item[f.id];
+          if (f.type === 'number' && f.id === 'price') fVal = fVal.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+          tooltipContent += `
+            <div class="tooltip-row">
+              <span class="tooltip-label">${f.label}:</span>
+              <span class="tooltip-value">${fVal}</span>
+            </div>
+          `;
+        });
+      } else {
+        tooltipContent = `<div class="tooltip-row"><span class="tooltip-label">Giá trị:</span><span class="tooltip-value">${val}</span></div>`;
+      }
+
+      return `<div style="flex: 1; height: ${height}%; background: ${bgColor}; border-radius: 2px 2px 0 0; transition: background-color 0.1s; cursor: help;" data-tooltip='${tooltipContent.replace(/'/g, "&apos;")}'></div>`;
     }).join('');
 
     // Update progress
