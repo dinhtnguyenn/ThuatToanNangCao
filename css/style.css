@@ -1023,12 +1023,17 @@ input[type="range"]::-webkit-slider-thumb:hover {
   gap: var(--space-sm);
 }
 
+.vis-stat-wide {
+  grid-column: span 2;
+}
+
 .vis-stat {
   text-align: center;
   padding: var(--space-md);
   background: var(--bg-glass);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
+  min-width: 0;
 }
 
 .vis-stat .label {
@@ -1036,13 +1041,15 @@ input[type="range"]::-webkit-slider-thumb:hover {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
 .vis-stat .value {
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   font-weight: 800;
   font-family: var(--font-mono);
   margin-top: 2px;
+  white-space: nowrap;
 }
 
 .vis-stat .value.cyan {

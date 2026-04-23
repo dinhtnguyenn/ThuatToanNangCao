@@ -214,7 +214,7 @@ class Visualizer {
               <div class="label">Số hoán đổi</div>
               <div class="value red" id="vis-swaps">0</div>
             </div>
-            <div class="vis-stat">
+            <div class="vis-stat vis-stat-wide">
               <div class="label" id="vis-memory-label">Bộ nhớ / Call Stack</div>
               <div class="value purple" id="vis-memory-val">0</div>
             </div>
@@ -937,11 +937,11 @@ class Visualizer {
     const memVal = document.getElementById('vis-memory-val');
     if (memVal) {
       if (this.algorithm === 'merge') {
-        memVal.textContent = `O(N) - Aux Array: ${this.sampleSize}`;
+        memVal.textContent = `O(N) | Aux: ${this.sampleSize}`;
       } else if (this.algorithm === 'quick') {
-        memVal.textContent = `O(log N) - Call Stack: ${this.activeDepth}`;
+        memVal.textContent = `O(log N) | Stack: ${this.activeDepth}`;
       } else {
-        memVal.textContent = `O(1) - Rỗng`;
+        memVal.textContent = `O(1)`;
       }
     }
 
