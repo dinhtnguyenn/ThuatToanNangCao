@@ -2806,7 +2806,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .guide-image img { max-width: 100%; height: auto; }
-.toast-container { width: 90% !important; left: 5% !important; right: auto !important; }
 #benchmark-chart-container { position: relative; height: 300px; width: 100%; }
 /* ============================================
    FINAL RESPONSIVE CONSOLIDATION
@@ -2839,6 +2838,14 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
   #benchmark-chart-container { height: 250px !important; }
   .benchmark-stats { display: grid !important; grid-template-columns: 1fr !important; gap: var(--space-sm) !important; }
+
+  /* Toast Mobile */
+  .toast-container { 
+    width: 90% !important; 
+    left: 5% !important; 
+    right: auto !important; 
+    top: 20px !important; 
+  }
 }
 
 
